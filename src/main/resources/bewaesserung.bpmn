@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:camumda="http://camunda.org/schema/1.0/bpmn" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
   <bpmn:process id="bewaesserung_platz" name="Bewässerung Platz" isExecutable="true">
     <bpmn:startEvent id="StartEvent_1" name="Start">
       <bpmn:outgoing>Flow_To_Sensoren</bpmn:outgoing>
@@ -42,29 +42,29 @@
     <bpmn:sequenceFlow id="Flow_To_VentilSchliessen" sourceRef="Event_Timer20Min" targetRef="Activity_VentilSchliessen" />
     <bpmn:sequenceFlow id="Flow_To_Ende_Ja" sourceRef="Activity_VentilSchliessen" targetRef="EndEvent_1" />
   </bpmn:process>
-  <bpmdi:BPMNDIAgram id="BPMNDiagram_1">
-    <bpmdi:BPMNPlane id="BPMNLabel_1" bpmnElement="bewaesserung_platz">
-      <bpmdi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_1">
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="bewaesserung_platz">
+      <bpmndi:BPMNShape id="_BPMMHape_StartEvent_2" bpmnElement="StartEvent_1">
         <dc:Bounds x="179" y="99" width="36" height="36" />
-      </bpmdi:BPMNShape>
-      <bpmdi:BPMNShape id="Activity_Sensoren_di" bpmnElement="Activity_Sensoren">
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_Sensoren_di" bpmnElement="Activity_Sensoren">
         <dc:Bounds x="147" y="180" width="100" height="80" />
-      </bpmdi:BPMNShape>
-      <bpmdi:BPMNShape id="Gateway_Entscheidung_di" bpmnElement="Gateway_Entscheidung" isMarkerVisible="true">
-        <dc:Bounds x="172" y="400" width="50" height="50" />
-      </bpmdi:BPMNShape>
-      <bpmdi:BPMNShape id="Activity_VentilOeffnen_di" bpmnElement="Activity_VentilOeffnen">
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Entscheidung_di" bpmnElement="Gateway_Entscheidung" isMarkerVisible="true">
+        <dc:Bounds x="172" y="300" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_VentilOeffnen_di" bpmnElement="Activity_VentilOeffnen">
         <dc:Bounds x="290" y="285" width="100" height="80" />
-      </bpmdi:BPMNShape>
-      <bpmdi:BPMNShape id="Event_Timer20Min_di" bpmnElement="Event_Timer20Min">
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_Timer20Min_di" bpmnElement="Event_Timer20Min">
         <dc:Bounds x="322" y="412" width="36" height="36" />
-      </bpmdi:BPMNShape>
-      <bpmdi:BPMNShape id="Activity_VentilSchliessen_di" bpmnElement="Activity_VentilSchliessen">
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_VentilSchliessen_di" bpmnElement="Activity_VentilSchliessen">
         <dc:Bounds x="290" y="490" width="100" height="80" />
-      </bpmdi:BPMNShape>
-      <bpmdi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
         <dc:Bounds x="179" y="612" width="36" height="36" />
-      </bpmdi:BPMNShape>
-    </bpmdi:BPMNPlane>
-  </bpmdi:BPMNDiagram>
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
 </bpmn:definitions>
