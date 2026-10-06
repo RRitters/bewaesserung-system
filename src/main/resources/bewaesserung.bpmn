@@ -1,70 +1,99 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
-  <bpmn:process id="bewaesserung_platz" name="Bewässerung Platz" isExecutable="true">
-    <bpmn:startEvent id="StartEvent_1" name="Start">
-      <bpmn:outgoing>Flow_To_Sensoren</bpmn:outgoing>
-    </bpmn:startEvent>
-    <bpmn:serviceTask id="Activity_Sensoren" name="Sensor auslesen" camunda:delegateExpression="${getSensorDataDelegate}">
-      <bpmn:incoming>Flow_To_Sensoren</bpmn:incoming>
-      <bpmn:outgoing>Flow_To_Gateway</bpmn:outgoing>
-    </bpmn:serviceTask>
-    <bpmn:exclusiveGateway id="Gateway_Entscheidung" name="Boden zu trocken?" default="Flow_Nein">
-      <bpmn:incoming>Flow_To_Gateway</bpmn:incoming>
-      <bpmn:outgoing>Flow_Ja</bpmn:outgoing>
-      <bpmn:outgoing>Flow_Nein</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:serviceTask id="Activity_VentilOeffnen" name="Ventil öffnen" camunda:delegateExpression="${openValveDelegate}">
-      <bpmn:incoming>Flow_Ja</bpmn:incoming>
-      <bpmn:outgoing>Flow_To_Timer</bpmn:outgoing>
-    </bpmn:serviceTask>
-    <bpmn:intermediateCatchEvent id="Event_Timer20Min" name="20 Min gießen">
-      <bpmn:incoming>Flow_To_Timer</bpmn:incoming>
-      <bpmn:outgoing>Flow_To_VentilSchliessen</bpmn:outgoing>
-      <bpmn:timerEventDefinition id="TimerEventDefinition_1">
-        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT2MM</bpmn:timeDuration>
-      </bpmn:timerEventDefinition>
-    </bpmn:intermediateCatchEvent>
-    <bpmn:serviceTask id="Activity_VentilSchliessen" name="Ventil schließen" camunda:delegateExpression="${closeValveDelegate}">
-      <bpmn:incoming>Flow_To_VentilSchliessen</bpmn:incoming>
-      <bpmn:outgoing>Flow_To_Ende_Ja</bpmn:outgoing>
-    </bpmn:serviceTask>
-    <bpmn:endEvent id="EndEvent_1" name="Ende">
-      <bpmn:incoming>Flow_To_Ende_Ja</bpmn:incoming>
-      <bpmn:incoming>Flow_Nein</bpmn:incoming>
-    </bpmn:endEvent>
-    <bpmn:sequenceFlow id="Flow_To_Sensoren" sourceRef="StartEvent_1" targetRef="Activity_Sensoren" />
-    <bpmn:sequenceFlow id="Flow_To_Gateway" sourceRef="Activity_Sensoren" targetRef="Gateway_Entscheidung" />
-    <bpmn:sequenceFlow id="Flow_Ja" name="Ja" sourceRef="Gateway_Entscheidung" targetRef="Activity_VentilOeffnen">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${bodenfeuchte35cm &lt; 35.0}</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_Nein" name="Nein" sourceRef="Gateway_Entscheidung" targetRef="EndEvent_1" />
-    <bpmn:sequenceFlow id="Flow_To_Timer" sourceRef="Activity_VentilOeffnen" targetRef="Event_Timer20Min" />
-    <bpmn:sequenceFlow id="Flow_To_VentilSchliessen" sourceRef="Event_Timer20Min" targetRef="Activity_VentilSchliessen" />
-    <bpmn:sequenceFlow id="Flow_To_Ende_Ja" sourceRef="Activity_VentilSchliessen" targetRef="EndEvent_1" />
-  </bpmn:process>
-  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
-    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="bewaesserung_platz">
-      <bpmndi:BPMNShape id="_BPMMHape_StartEvent_2" bpmnElement="StartEvent_1">
-        <dc:Bounds x="179" y="99" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_Sensoren_di" bpmnElement="Activity_Sensoren">
-        <dc:Bounds x="147" y="180" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_Entscheidung_di" bpmnElement="Gateway_Entscheidung" isMarkerVisible="true">
-        <dc:Bounds x="172" y="300" width="50" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_VentilOeffnen_di" bpmnElement="Activity_VentilOeffnen">
-        <dc:Bounds x="290" y="285" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_Timer20Min_di" bpmnElement="Event_Timer20Min">
-        <dc:Bounds x="322" y="412" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_VentilSchliessen_di" bpmnElement="Activity_VentilSchliessen">
-        <dc:Bounds x="290" y="490" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
-        <dc:Bounds x="179" y="612" width="36" height="36" />
-      </bpmndi:BPMNShape>
-    </bpmndi:BPMNPlane>
-  </bpmndi:BPMNDiagram>
+    <bpmn:process id="bewaesserung_platz" name="Bewässerung Platz" isExecutable="true">
+        <bpmn:startEvent id="StartEvent_1" name="Start">
+            <bpmn:outgoing>Flow_To_Sensoren</bpmn:outgoing>
+        </bpmn:startEvent>
+        <bpmn:serviceTask id="Activity_Sensoren" name="Sensor auslesen" camunda:delegateExpression="${getSensorDataDelegate}">
+            <bpmn:incoming>Flow_To_Sensoren</bpmn:incoming>
+            <bpmn:outgoing>Flow_To_Gateway</bpmn:outgoing>
+        </bpmn:serviceTask>
+        <bpmn:exclusiveGateway id="Gateway_Entscheidung" name="Boden zu trocken?" default="Flow_Nein">
+            <bpmn:incoming>Flow_To_Gateway</bpmn:incoming>
+            <bpmn:outgoing>Flow_Ja</bpmn:outgoing>
+            <bpmn:outgoing>Flow_Nein</bpmn:outgoing>
+        </bpmn:exclusiveGateway>
+        <bpmn:serviceTask id="Activity_VentilOeffnen" name="Ventil öffnen" camunda:delegateExpression="${openValveDelegate}">
+            <bpmn:incoming>Flow_Ja</bpmn:incoming>
+            <bpmn:outgoing>Flow_To_Timer</bpmn:outgoing>
+        </bpmn:serviceTask>
+        <bpmn:intermediateCatchEvent id="Event_Timer20Min" name="20 Min gießen">
+            <bpmn:incoming>Flow_To_Timer</bpmn:incoming>
+            <bpmn:outgoing>Flow_To_VentilSchliessen</bpmn:outgoing>
+            <bpmn:timerEventDefinition id="TimerEventDefinition_1">
+                <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT2MM</bpmn:timeDuration>
+            </bpmn:timerEventDefinition>
+        </bpmn:intermediateCatchEvent>
+        <bpmn:serviceTask id="Activity_VentilSchliessen" name="Ventil schließen" camunda:delegateExpression="${closeValveDelegate}">
+            <bpmn:incoming>Flow_To_VentilSchliessen</bpmn:incoming>
+            <bpmn:outgoing>Flow_To_Ende_Ja</bpmn:outgoing>
+        </bpmn:serviceTask>
+        <bpmn:endEvent id="EndEvent_1" name="Ende">
+            <bpmn:incoming>Flow_To_Ende_Ja</bpmn:incoming>
+            <bpmn:incoming>Flow_Nein</bpmn:incoming>
+        </bpmn:endEvent>
+        <bpmn:sequenceFlow id="Flow_To_Sensoren" sourceRef="StartEvent_1" targetRef="Activity_Sensoren" />
+        <bpmn:sequenceFlow id="Flow_To_Gateway" sourceRef="Activity_Sensoren" targetRef="Gateway_Entscheidung" />
+        <bpmn:sequenceFlow id="Flow_Ja" name="Ja" sourceRef="Gateway_Entscheidung" targetRef="Activity_VentilOeffnen">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${bodenfeuchte35cm < 35.0}]]></bpmn:conditionExpression>
+        </bpmn:sequenceFlow>
+        <bpmn:sequenceFlow id="Flow_Nein" name="Nein" sourceRef="Gateway_Entscheidung" targetRef="EndEvent_1" />
+        <bpmn:sequenceFlow id="Flow_To_Timer" sourceRef="Activity_VentilOeffnen" targetRef="Event_Timer20Min" />
+        <bpmn:sequenceFlow id="Flow_To_VentilSchliessen" sourceRef="Event_Timer20Min" targetRef="Activity_VentilSchliessen" />
+        <bpmn:sequenceFlow id="Flow_To_Ende_Ja" sourceRef="Activity_VentilSchliessen" targetRef="EndEvent_1" />
+    </bpmn:process>
+    <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+        <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="bewaesserung_platz">
+            <bpmndi:BPMNShape id="_BPMMHape_StartEvent_2" bpmnElement="StartEvent_1">
+                <dc:Bounds x="179" y="99" width="36" height="36" />
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape id="Activity_Sensoren_di" bpmnElement="Activity_Sensoren">
+                <dc:Bounds x="147" y="180" width="100" height="80" />
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape id="Gateway_Entscheidung_di" bpmnElement="Gateway_Entscheidung" isMarkerVisible="true">
+                <dc:Bounds x="172" y="300" width="50" height="50" />
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape id="Activity_VentilOeffnen_di" bpmnElement="Activity_VentilOeffnen">
+                <dc:Bounds x="290" y="285" width="100" height="80" />
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape id="Event_Timer20Min_di" bpmnElement="Event_Timer20Min">
+                <dc:Bounds x="322" y="412" width="36" height="36" />
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape id="Activity_VentilSchliessen_di" bpmnElement="Activity_VentilSchliessen">
+                <dc:Bounds x="290" y="490" width="100" height="80" />
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+                <dc:Bounds x="179" y="612" width="36" height="36" />
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNEdge id="Flow_To_Sensoren_di" bpmnElement="Flow_To_Sensoren">
+                <di:waypoint x="197" y="135" />
+                <di:waypoint x="197" y="180" />
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge id="Flow_To_Gateway_di" bpmnElement="Flow_To_Gateway">
+                <di:waypoint x="197" y="260" />
+                <di:waypoint x="197" y="300" />
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge id="Flow_Ja_di" bpmnElement="Flow_Ja">
+                <di:waypoint x="222" y="325" />
+                <di:waypoint x="290" y="325" />
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge id="Flow_Nein_di" bpmnElement="Flow_Nein">
+                <di:waypoint x="197" y="350" />
+                <di:waypoint x="197" y="612" />
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge id="Flow_To_Timer_di" bpmnElement="Flow_To_Timer">
+                <di:waypoint x="340" y="365" />
+                <di:waypoint x="340" y="412" />
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge id="Flow_To_VentilSchliessen_di" bpmnElement="Flow_To_VentilSchliessen">
+                <di:waypoint x="340" y="448" />
+                <di:waypoint x="340" y="490" />
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge id="Flow_To_Ende_Ja_di" bpmnElement="Flow_To_Ende_Ja">
+                <di:waypoint x="340" y="570" />
+                <di:waypoint x="340" y="630" />
+                <di:waypoint x="215" y="630" />
+            </bpmndi:BPMNEdge>
+        </bpmndi:BPMNPlane>
+    </bpmndi:BPMNDiagram>
 </bpmn:definitions>
