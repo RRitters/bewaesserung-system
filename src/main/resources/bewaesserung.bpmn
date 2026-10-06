@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
-    <bpmn:process id="bewaesserung_platz" name="Bewässerung Platz" isExecutable="true">
+    <bpmn:process id="bewaesserung_platz" name="Bewässerung Platz" isExecutable="true" camunda:historyTimeToLive="P180D">
         <bpmn:startEvent id="StartEvent_1" name="Start">
             <bpmn:outgoing>Flow_To_Sensoren</bpmn:outgoing>
         </bpmn:startEvent>
@@ -13,7 +13,7 @@
             <bpmn:outgoing>Flow_Ja</bpmn:outgoing>
             <bpmn:outgoing>Flow_Nein</bpmn:outgoing>
         </bpmn:exclusiveGateway>
-        <bpmn:serviceTask id="Activity_VentilOeffnen" name="Ventil öffnen" camunda:delegateExpression="${openValveDelegate}">
+        <bpmn:serviceTask id="Activity_VentilOeffnen" name="Ventil öffnen" camunda:delegateExpression="${ventilOeffnenDelegate}">
             <bpmn:incoming>Flow_Ja</bpmn:incoming>
             <bpmn:outgoing>Flow_To_Timer</bpmn:outgoing>
         </bpmn:serviceTask>
@@ -24,7 +24,7 @@
                 <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT2MM</bpmn:timeDuration>
             </bpmn:timerEventDefinition>
         </bpmn:intermediateCatchEvent>
-        <bpmn:serviceTask id="Activity_VentilSchliessen" name="Ventil schließen" camunda:delegateExpression="${closeValveDelegate}">
+        <bpmn:serviceTask id="Activity_VentilSchliessen" name="Ventil schließen" camunda:delegateExpression="${ventilSchliessenDelegate}">
             <bpmn:incoming>Flow_To_VentilSchliessen</bpmn:incoming>
             <bpmn:outgoing>Flow_To_Ende_Ja</bpmn:outgoing>
         </bpmn:serviceTask>
