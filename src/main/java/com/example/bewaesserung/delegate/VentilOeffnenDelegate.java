@@ -9,11 +9,6 @@ public class VentilOeffnenDelegate implements JavaDelegate {
 
     @Override
     public void execute(DelegateExecution execution) throws Exception {
-        System.out.println("==========================================");
-        System.out.println(">>> Camunda Task: Ventil wird geöffnet! <<<");
-        System.out.println("==========================================");
-
-        // Hier kannst du später deine Bewässerungslogik aufrufen, z.B.:
-        // wasserSteuerungService.oeffneVentil();
+        System.out.println("[VENTIL] Ventil wird GEÖFFNET.");
     }
 }
