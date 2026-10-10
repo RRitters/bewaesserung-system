@@ -31,26 +31,32 @@
   // 1. Viewer initialisieren
   const viewer = new BpmnJS({ container: '#canvas' });
 
-  // 2. BPMN-Datei laden
   async function loadDiagram() {
     try {
-      // Da die Datei im static-Ordner liegt, kann sie direkt geladen werden
+      // BPMN-Datei laden
       const response = await fetch('/bewaesserung.bpmn');
       const xml = await response.text();
 
-      // 3. Diagramm rendern
+      // 2. WICHTIG: Warten, bis das XML vollständig eingelesen ist
       await viewer.importXML(xml);
 
-      // Ansicht an das Fenster anpassen (Zoom)
+      // Zoom anpassen
       viewer.get('canvas').zoom('fit-viewport');
-      console.log("Diagramm erfolgreich geladen.");
+
+      // 3. Erst JETZT (nach dem Laden) den Marker auf das Element setzen
+      const canvas = viewer.get('canvas');
+
+      // Hier kommt die saubere ID hin (ohne _di!)
+      canvas.addMarker('Activity_Sensoren', 'highlight-active');
+
+      console.log("Diagramm geladen und Element 'Activity_Sensoren' markiert.");
+
     } catch (err) {
-      console.error('Fehler beim Laden der BPMN-Datei:', err);
+      console.error('Fehler beim Laden des Diagramms:', err);
     }
   }
 
   loadDiagram();
 </script>
-
 </body>
 </html>
