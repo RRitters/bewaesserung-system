@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Bewässerungs-Dashboard</title>
+  <!-- bpmn-js Viewer CSS & JS über CDN einbinden -->
+  <link rel="stylesheet" href="https://unpkg.com/bpmn-js/dist/assets/diagram-js.css" />
+  <link rel="stylesheet" href="https://unpkg.com/bpmn-js/dist/assets/bpmn-font/css/bpmn.css" />
+  <script src="https://unpkg.com/bpmn-js/dist/bpmn-viewer.development.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    #canvas {
+      width: 100%;
+      height: 500px;
+      border: 1px solid #ccc;
+      background-color: #f8f9fa;
+    }
+    .highlight-active:not(.djs-connection) .djs-visual > :nth-child(1) {
+      stroke: #ff4d4d !important; /* Rote Rahmenfarbe */
+      stroke-width: 3px !important;
+      fill: #ffe6e6 !important;   /* Hellroter Hintergrund */
+    }
+  </style>
+</head>
+<body>
+
+<h1>Prozess-Ansicht: Bewässerung</h1>
+<div id="canvas"></div>
+
+<script>
+  // 1. Viewer initialisieren
+  const viewer = new BpmnJS({ container: '#canvas' });
+
+  // 2. BPMN-Datei laden
+  async function loadDiagram() {
+    try {
+      // Da die Datei im static-Ordner liegt, kann sie direkt geladen werden
+      const response = await fetch('/bewaesserung.bpmn');
+      const xml = await response.text();
+
+      // 3. Diagramm rendern
+      await viewer.importXML(xml);
+
+      // Ansicht an das Fenster anpassen (Zoom)
+      viewer.get('canvas').zoom('fit-viewport');
+      console.log("Diagramm erfolgreich geladen.");
+    } catch (err) {
+      console.error('Fehler beim Laden der BPMN-Datei:', err);
+    }
+  }
+
+  loadDiagram();
+</script>
+
+</body>
+</html>
