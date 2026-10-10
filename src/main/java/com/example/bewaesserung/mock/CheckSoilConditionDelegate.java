@@ -24,6 +24,7 @@ public class CheckSoilConditionDelegate implements JavaDelegate {
         // Wir schreiben eine Prozessvariable 'bodenZuTrocken' (true oder false),
         // auf die das BPMN-Gateway (die Raute) hören kann.
         execution.setVariable("bodenZuTrocken", zuTrocken);
+        execution.setVariable("bodenZuTrocken", true); // TODO nur zum Test
 
         System.out.printf("[GATEWAY MOCK] Bodenfeuchte 10cm: %.1f%% -> Boden zu trocken? %s%n",
                 feuchte10cm != null ? feuchte10cm : 0.0, zuTrocken ? "JA (Ventil öffnen)" : "NEIN (Überspringen)");

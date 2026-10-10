@@ -15,13 +15,12 @@
       <bpmn:incoming>Flow_To_Gateway</bpmn:incoming>
       <bpmn:outgoing>Flow_Ja</bpmn:outgoing>
       <bpmn:outgoing>Flow_Nein</bpmn:outgoing>
-      <bpmn:outgoing>Flow_138rv7d</bpmn:outgoing>
     </bpmn:exclusiveGateway>
     <bpmn:sequenceFlow id="Flow_Ja" name="Ja" sourceRef="Gateway_Entscheidung" targetRef="Activity_VentilOeffnen">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${bodenZuTrocken == true}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_Nein" name="Nein" sourceRef="Gateway_Entscheidung">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${bodenZuTrocken == false}</bpmn:conditionExpression>
+    <bpmn:sequenceFlow id="Flow_Nein" name="Nein" sourceRef="Gateway_Entscheidung" targetRef="EndEvent_1">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${bodenZuTrocken == false}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:serviceTask id="Activity_VentilOeffnen" name="Ventil öffnen" camunda:delegateExpression="${ventilOeffnenDelegate}">
       <bpmn:incoming>Flow_Ja</bpmn:incoming>
@@ -48,7 +47,7 @@
     <bpmn:sequenceFlow id="Flow_To_Timer" sourceRef="Activity_VentilOeffnen" targetRef="Event_Timer20Min" />
     <bpmn:sequenceFlow id="Flow_To_VentilSchliessen" sourceRef="Event_Timer20Min" targetRef="Activity_VentilSchliessen" />
     <bpmn:sequenceFlow id="Flow_To_Ende_Ja" sourceRef="Activity_VentilSchliessen" targetRef="EndEvent_1" />
-    <bpmn:sequenceFlow id="Flow_138rv7d" sourceRef="Gateway_Entscheidung" targetRef="EndEvent_1" />
+    <bpmn:sequenceFlow id="Flow_138rv7d" name="Nein" sourceRef="Gateway_Entscheidung" targetRef="EndEvent_1" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="bewaesserung_platz">
@@ -104,6 +103,9 @@
       <bpmndi:BPMNEdge id="Flow_138rv7d_di" bpmnElement="Flow_138rv7d">
         <di:waypoint x="197" y="350" />
         <di:waypoint x="197" y="612" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="201" y="478" width="23" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
