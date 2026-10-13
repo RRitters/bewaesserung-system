@@ -48,54 +48,57 @@
   </table>
 </div>
 
-<!-- Dein bereits vorhandener <script>-Bereich -->
 <script>
   // Funktion zum Abrufen und Rendern der aktiven Alarme
-  async function fetchActiveEvents() {
-    try {
-      const response = await fetch('/api/events/active');
-      if (!response.ok) return;
-      const events = await response.json();
+  document.addEventListener("DOMContentLoaded", function() {
+    async function fetchActiveEvents() {
+      try {
+        const response = await fetch('/api/events/active');
+        if (!response.ok) return;
+        const events = await response.json();
 
-      const tbody = document.getElementById('eventTableBody');
-      if (!tbody) return; // Verhindert den Fehler, wenn das Element fehlt
-      tbody.innerHTML = ''; // Tabelle leeren
+        const tbody = document.getElementById('eventTableBody');
+        if (tbody === null) {
+          return; // Verhindert den Fehler, wenn das Element fehlt
+        }
+        tbody.innerHTML = ''; // Tabelle leeren
 
-      if (events.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="padding: 10px; text-align: center; color: #6c757d;">Keine aktiven Störungen. Anlage läuft stabil.</td></tr>';
-        return;
-      }
-
-      events.forEach(event => {
-        const row = document.createElement('tr');
-
-        // Roter Hintergrund bei echten Fehlern
-        if (event.category === 'FEHLER') {
-          row.style.background = '#f8d7da';
-        } else {
-          row.style.background = '#fff3cd'; // Gelb/Orange bei Warnungen
+        if (events.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="padding: 10px; text-align: center; color: #6c757d;">Keine aktiven Störungen. Anlage läuft stabil.</td></tr>';
+          return;
         }
 
-        // Exakter Zeitstempel (ISO-String mit Millisekunden)
-        const formattedTime = new Date(event.timestamp).toISOString();
+        events.forEach(event => {
+          const row = document.createElement('tr');
 
-        row.innerHTML = `
-                    <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">${formattedTime}</td>
-                    <td style="padding: 8px; border: 1px solid #dee2e6; font-weight: bold;">${event.category}</td>
-                    <td style="padding: 8px; border: 1px solid #dee2e6;">${event.groupName}</td>
-                    <td style="padding: 8px; border: 1px solid #dee2e6;">${event.plotId || '-'}</td>
-                    <td style="padding: 8px; border: 1px solid #dee2e6;">${event.message}</td>
-                `;
-        tbody.appendChild(row);
-      });
-    } catch (error) {
-      console.error('Fehler beim Laden der Events:', error);
-    }
-  }
+          // Roter Hintergrund bei echten Fehlern
+          if (event.category === 'FEHLER') {
+            row.style.background = '#f8d7da';
+          } else {
+            row.style.background = '#fff3cd'; // Gelb/Orange bei Warnungen
+          }
 
-  // Beim Laden und alle 3 Sekunden aktualisieren
-  fetchActiveEvents();
-  setInterval(fetchActiveEvents, 3000);
+          // Exakter Zeitstempel (ISO-String mit Millisekunden)
+          const formattedTime = new Date(event.timestamp).toISOString();
+
+          row.innerHTML = `
+                      <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">${formattedTime}</td>
+                      <td style="padding: 8px; border: 1px solid #dee2e6; font-weight: bold;">${event.category}</td>
+                      <td style="padding: 8px; border: 1px solid #dee2e6;">${event.groupName}</td>
+                      <td style="padding: 8px; border: 1px solid #dee2e6;">${event.plotId || '-'}</td>
+                      <td style="padding: 8px; border: 1px solid #dee2e6;">${event.message}</td>
+                  `;
+          tbody.appendChild(row);
+        });
+      } catch (error) {
+        console.error('Fehler beim Laden der Events:', error);
+      }
+    } // <-- Hier war vorher eine geschweifte Klammer zu viel
+
+    // Beim Laden und alle 3 Sekunden aktualisieren (jetzt sauber innerhalb von DOMContentLoaded)
+    fetchActiveEvents();
+    setInterval(fetchActiveEvents, 3000);
+  });
 </script>
 
 <script>
