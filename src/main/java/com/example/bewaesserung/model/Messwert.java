@@ -4,8 +4,8 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "MESSWERTE", schema = "SYSTEM") // Oder das Schema eintragen, in dem sie liegt
-public class SensorMeasurement {
+@Table(name = "MESSWERTE")
+public class Messwert {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -16,16 +16,13 @@ public class SensorMeasurement {
     private Long sensorId;
 
     @Column(name = "WERT")
-    private double wert;
+    private Double wert;
 
     @Column(name = "EINHEIT")
     private String einheit;
 
     @Column(name = "GEMESSEN_AM")
-    private LocalDateTime gemessenAm = LocalDateTime.now();
-
-    // Standard-Konstruktor
-    public SensorMeasurement() {}
+    private LocalDateTime gemessenAm;
 
     // Getter und Setter
     public Long getId() { return id; }
@@ -34,8 +31,8 @@ public class SensorMeasurement {
     public Long getSensorId() { return sensorId; }
     public void setSensorId(Long sensorId) { this.sensorId = sensorId; }
 
-    public double getWert() { return wert; }
-    public void setWert(double wert) { this.wert = wert; }
+    public Double getWert() { return wert; }
+    public void setWert(Double wert) { this.wert = wert; }
 
     public String getEinheit() { return einheit; }
     public void setEinheit(String einheit) { this.einheit = einheit; }
