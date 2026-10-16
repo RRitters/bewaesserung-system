@@ -1,21 +1,16 @@
 package com.example.bewaesserung.model;
 
 public class ArduinoDataDto {
-    private String arduinoId;
-    private Long plotId;
-    private Double soilMoisture;
-    private Double tankLevel;
+    private String nodeIp;      // z.B. "ARDUROW01"
+    private Integer modbusId;   // z.B. 1
+    private Double wert;        // z.B. 42.5
 
-    // Getter und Setter
-    public String getArduinoId() { return arduinoId; }
-    public void setArduinoId(String arduinoId) { this.arduinoId = arduinoId; }
+    public String getNodeIp() { return nodeIp; }
+    public void setNodeIp(String nodeIp) { this.nodeIp = nodeIp; }
 
-    public Long getPlotId() { return plotId; }
-    public void setPlotId(Long plotId) { this.plotId = plotId; }
+    public Integer getModbusId() { return modbusId; }
+    public void setModbusId(Integer modbusId) { this.modbusId = modbusId; }
 
-    public Double getSoilMoisture() { return soilMoisture; }
-    public void setSoilMoisture(Double soilMoisture) { this.soilMoisture = soilMoisture; }
-
-    public Double getTankLevel() { return tankLevel; }
-    public void setTankLevel(Double tankLevel) { this.tankLevel = tankLevel; }
+    public Double getWert() { return wert; }
+    public void setWert(Double wert) { this.wert = wert; }
 }
