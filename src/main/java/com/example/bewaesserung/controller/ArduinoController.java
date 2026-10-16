@@ -3,8 +3,10 @@ package com.example.bewaesserung.controller;
 import com.example.bewaesserung.model.ArduinoDataDto;
 import com.example.bewaesserung.model.Messwert;
 import com.example.bewaesserung.model.Sensor;
+import com.example.bewaesserung.model.SystemEventLog;
 import com.example.bewaesserung.repository.MesswertRepository;
 import com.example.bewaesserung.repository.SensorRepository;
+import com.example.bewaesserung.repository.SystemEventLogRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,9 +25,12 @@ public class ArduinoController {
     @Autowired
     private MesswertRepository messwertRepository;
 
+    @Autowired
+    private SystemEventLogRepository eventLogRepository;
+
     @PostMapping("/data")
     public ResponseEntity<String> receiveSensorData(@RequestBody ArduinoDataDto data) {
-        // 1. Welcher Sensor funkt hier?
+        // 1. Sensor suchen
         Optional<Sensor> sensorOpt = sensorRepository.findByNodeIpAndModbusId(data.getNodeIp(), data.getModbusId());
 
         if (sensorOpt.isEmpty()) {
@@ -39,11 +44,33 @@ public class ArduinoController {
         Messwert messwert = new Messwert();
         messwert.setSensorId(sensor.getId());
         messwert.setWert(data.getWert());
-        messwert.setEinheit(sensor.getEinheit()); // Einheit direkt vom Sensor übernehmen
+        messwert.setEinheit(sensor.getEinheit());
         messwert.setGemessenAm(LocalDateTime.now());
-
         messwertRepository.save(messwert);
 
-        return ResponseEntity.ok("Messwert erfolgreich gespeichert für Sensor: " + sensor.getName());
+        // 3. Schwellwert-Logik (Das Gehirn)
+        String antwort = "Messwert gespeichert. ";
+
+        if (sensor.getSollMin() != null && data.getWert() < sensor.getSollMin()) {
+            antwort += "ACHTUNG: Zu trocken! Bewässerung erforderlich.";
+            logEvent("WARNUNG", "Zu trocken: " + data.getWert() + sensor.getEinheit() + " an " + sensor.getName());
+
+            // TODO: Hier später das Ventil (Aktor) ansteuern!
+
+        } else if (sensor.getSollMax() != null && data.getWert() > sensor.getSollMax()) {
+            antwort += "ACHTUNG: Zu feucht! Bewässerung stoppen.";
+            logEvent("INFO", "Ausreichend feucht: " + data.getWert() + sensor.getEinheit() + " an " + sensor.getName());
+        } else {
+            antwort += "Alles im grünen Bereich.";
+        }
+
+        return ResponseEntity.ok(antwort);
+    }
+
+    // Hilfsmethode für das Event-Logging
+    private void logEvent(String typ, String nachricht) {
+        // Nutzt deinen Konstruktor: category, groupName, plotId, message
+        SystemEventLog event = new SystemEventLog(typ, "SENSORIK", null, nachricht);
+        eventLogRepository.save(event);
     }
 }
