@@ -11,6 +11,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -73,4 +76,22 @@ public class ArduinoController {
         SystemEventLog event = new SystemEventLog(typ, "SENSORIK", null, nachricht);
         eventLogRepository.save(event);
     }
+
+// ... (deine bestehende Klasse)
+
+    @PostMapping("/reboot")
+    public ResponseEntity<String> handleReboot(@RequestBody RebootRequest request) {
+        // Ausgabe in der Linux-Konsole zur Kontrolle
+        System.out.println("Arduino Neustart gemeldet! Status: " + request.status() + ", Grund: " + request.grund());
+
+        // Hier könntest du später z.B. einen Datenbank-Eintrag ("System neu gestartet") anlegen.
+
+        // Wichtig für den ESP32: Er wartet auf ein HTTP 200 (OK)
+        return ResponseEntity.ok("{\"status\":\"ok\"}");
+    }
+
+// ... (Ende deiner Klasse)
 }
+
+// Wenn du aktuelles Java nutzt (Java 14+), ist das die kürzeste Form für ein Datenobjekt:
+record RebootRequest(String status, String grund) {}

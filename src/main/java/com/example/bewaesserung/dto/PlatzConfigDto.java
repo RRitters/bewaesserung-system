@@ -5,30 +5,30 @@ import java.util.List;
 public class PlatzConfigDto {
     private Long platzId;
     private String platzName;
-    private int ventilPin;
-    private List<Integer> modbusIds;
-    private double ventilKorrekturFaktor;
-    private int letzteVentilStellung;
+    private List<Integer> sensorModbusIds;
 
-    // Standard Konstruktor
+    // Neue Ventil-Parameter für das Modbus-Relais (Kugelhahn)
+    private int ventilModbusId;
+    private int ventilLaufzeitMs;
+    private int sollPosition; // z.B. 0-100%
+
     public PlatzConfigDto() {}
 
-    // Getter und Setter
     public Long getPlatzId() { return platzId; }
     public void setPlatzId(Long platzId) { this.platzId = platzId; }
 
     public String getPlatzName() { return platzName; }
     public void setPlatzName(String platzName) { this.platzName = platzName; }
 
-    public int getVentilPin() { return ventilPin; }
-    public void setVentilPin(int ventilPin) { this.ventilPin = ventilPin; }
+    public List<Integer> getSensorModbusIds() { return sensorModbusIds; }
+    public void setSensorModbusIds(List<Integer> sensorModbusIds) { this.sensorModbusIds = sensorModbusIds; }
 
-    public List<Integer> getModbusIds() { return modbusIds; }
-    public void setModbusIds(List<Integer> modbusIds) { this.modbusIds = modbusIds; }
+    public int getVentilModbusId() { return ventilModbusId; }
+    public void setVentilModbusId(int ventilModbusId) { this.ventilModbusId = ventilModbusId; }
 
-    public double getVentilKorrekturFaktor() { return ventilKorrekturFaktor; }
-    public void setVentilKorrekturFaktor(double ventilKorrekturFaktor) { this.ventilKorrekturFaktor = ventilKorrekturFaktor; }
+    public int getVentilLaufzeitMs() { return ventilLaufzeitMs; }
+    public void setVentilLaufzeitMs(int ventilLaufzeitMs) { this.ventilLaufzeitMs = ventilLaufzeitMs; }
 
-    public int getLetzteVentilStellung() { return letzteVentilStellung; }
-    public void setLetzteVentilStellung(int letzteVentilStellung) { this.letzteVentilStellung = letzteVentilStellung; }
+    public int getSollPosition() { return sollPosition; }
+    public void setSollPosition(int sollPosition) { this.sollPosition = sollPosition; }
 }
