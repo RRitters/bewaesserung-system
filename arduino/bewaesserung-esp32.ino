@@ -3,9 +3,12 @@
 #include <WiFiClientSecure.h>
 #include <vector>
 #include <ArduinoJson.h>
+#include <time.h>
+#include <sys/time.h> // Wichtig für gettimeofday
 
-#define WIFI_SSID "Wokwi-GUEST"
-#define WIFI_PASSWORD ""
+// --- DEINE ECHTEN WLAN DATEN ---
+#define WIFI_SSID "Nathamon2508"
+#define WIFI_PASSWORD "0611546046"
 
 // --- ENUMS & URLS ---
 enum connections {
@@ -55,6 +58,43 @@ const unsigned long VERSUCHS_INTERVALL = 10000;
 unsigned int platzIndex = 0;
 unsigned int anzahlPlaetze = 0;
 
+const char* ntpServer1 = "pool.ntp.org";
+const char* ntpServer2 = "time.nist.gov";
+const long  gmtOffset_sec = 3600;     // 1 Stunde für MEZ (bzw. 7200 für Sommerzeit / MESZ)
+const int   daylightOffset_sec = 3600; // Sommerzeit-Offset in Sekunden (wird addiert, wenn aktiv)
+
+// --- ZEIT & NTP FUNKTIONEN (JETZT WIEDER GLOBAL) ---
+
+unsigned long getMillisekundenTimestamp() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    unsigned long mss = (unsigned long)(tv.tv_sec) * 1000 + (tv.tv_usec / 1000);
+    return mss;
+}
+
+String getFormatiertenZeitstempel() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    time_t nowSecs = tv.tv_sec;
+    struct tm timeinfo;
+    localtime_r(&nowSecs, &timeinfo);
+
+    int millisec = tv.tv_usec / 1000;
+
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer), "%04d.%02d.%02d %02d:%02d:%02d.%03d",
+            timeinfo.tm_year + 1900,
+            timeinfo.tm_mon + 1,
+            timeinfo.tm_mday,
+            timeinfo.tm_hour,
+            timeinfo.tm_min,
+            timeinfo.tm_sec,
+            millisec);
+
+    return String(buffer);
+}
+
 // --- KLASSEN DEFINITIONEN ---
 class Messwert {
 public:
@@ -96,9 +136,17 @@ public:
 
     void ueberpruefeStoerungen() { /* Logik kommt später */ }
     void regleDurchfluss() { /* Logik kommt später */ }
-    void leseSensoren() { /* Logik kommt später */ }
+
+    void leseSensoren() { 
+        // Test-Ausgabe mit Millisekunden-Zeitstempel:
+        Serial.printf("[%s] Lese Sensoren fuer Platz %s (ID: %d)\n", 
+                      getFormatiertenZeitstempel().c_str(), 
+                      platzName.c_str(), 
+                      platzId);
+    }
+    
     void sendeSensorenDaten() { /* Logik kommt später */ }
-}; 
+};
 
 std::vector<Platz> gartenPlaetze;
 
@@ -106,14 +154,13 @@ std::vector<Platz> gartenPlaetze;
 
 bool meldeNeustart() {
     Serial.println("Versuche Wiederanlauf an Backend zu melden...");
-    WiFiClientSecure *secureClient = new WiFiClientSecure;
+
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();     
+    secureClient.setTimeout(15000); 
     
-    if (secureClient) {
-        secureClient->setInsecure();     
-        secureClient->setTimeout(15000); 
-        
-        HTTPClient http;
-        http.begin(*secureClient, rebootUrl); 
+    HTTPClient http;
+    if (http.begin(secureClient, "throwback-announcer-upfront.ngrok-free.dev", 443, "/api/arduino/reboot", true)) {
         http.addHeader("Content-Type", "application/json");
         http.addHeader("ngrok-skip-browser-warning", "true"); 
         
@@ -128,20 +175,20 @@ bool meldeNeustart() {
         }
         
         http.end();
-        delete secureClient; 
         return erfolg;
+    } else {
+        Serial.println("HTTP Begin fehlgeschlagen!");
+        return false;
     }
-    return false;
 }
 
 void sendeConfigAck() {
-    WiFiClientSecure *secureClient = new WiFiClientSecure;
-    if (secureClient) {
-        secureClient->setInsecure();
-        secureClient->setTimeout(15000);
-        
-        HTTPClient http;
-        http.begin(*secureClient, serverUrl[CONFIGURE_ACK]);
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();
+    secureClient.setTimeout(15000);
+    
+    HTTPClient http;
+    if (http.begin(secureClient, serverUrl[CONFIGURE_ACK])) {
         http.addHeader("Content-Type", "application/json");
         http.addHeader("ngrok-skip-browser-warning", "true");
 
@@ -154,62 +201,61 @@ void sendeConfigAck() {
             Serial.printf("Fehler beim Senden des Config-ACK: %d\n", httpCode);
         }
         http.end();
-        delete secureClient;
     }
 }
 
 bool ladeKonfigurationVomServer() {
     Serial.println("Versuche Konfiguration vom Server zu holen...");
-    WiFiClientSecure *secureClient = new WiFiClientSecure;
-    bool erfolg = false;
-
-    if (secureClient) {
-        secureClient->setInsecure();
-        secureClient->setTimeout(15000);
-        
-        HTTPClient http;
-        http.begin(*secureClient, serverUrl[CONFIGURE]);
-        http.addHeader("ngrok-skip-browser-warning", "true");
-        
-        int httpCode = http.GET();
-
-        if (httpCode == HTTP_CODE_OK || httpCode == 200) {
-            String payload = http.getString();
-            DynamicJsonDocument doc(2048);
-            DeserializationError error = deserializeJson(doc, payload);
-
-            if (!error) {
-                gartenPlaetze.clear();
-                JsonArray array = doc.as<JsonArray>();
-                for (JsonObject platzObj : array) {
-                    Platz p;
-                    p.ladeAusJson(platzObj);
-                    gartenPlaetze.push_back(p);
-                }
-                Serial.printf("Erfolgreich %d Plätze konfiguriert!\n", gartenPlaetze.size());
-                sendeConfigAck();
-                erfolg = true; 
-            } else {
-                Serial.printf("JSON Parse Fehler: %s\n", error.c_str());
-            }
-        } else {
-            Serial.printf("Backend Config Fehler. Code: %d\n", httpCode);
-        }
-
-        http.end();
-        delete secureClient;
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();
+    secureClient.setTimeout(15000);
+    
+    HTTPClient http;
+    if (!http.begin(secureClient, serverUrl[CONFIGURE])) {
+        Serial.println("HTTP Begin für Config fehlgeschlagen!");
+        return false;
     }
+
+    http.addHeader("ngrok-skip-browser-warning", "true");
+    
+    int httpCode = http.GET();
+    Serial.printf("Config HTTP Code: %d\n", httpCode);
+
+    bool erfolg = false;
+    if (httpCode == HTTP_CODE_OK || httpCode == 200) {
+        String payload = http.getString();
+        Serial.println("Payload empfangen:");
+        Serial.println(payload);
+        
+        JsonDocument doc; 
+        DeserializationError error = deserializeJson(doc, payload);
+
+        if (!error) {
+            Serial.println("JSON erfolgreich geparst.");
+            gartenPlaetze.clear();
+            JsonArray array = doc.as<JsonArray>();
+            for (JsonObject platzObj : array) {
+                Platz p;
+                p.ladeAusJson(platzObj);
+                gartenPlaetze.push_back(p);
+            }
+            Serial.printf("Erfolgreich %d Plätze konfiguriert!\n", gartenPlaetze.size());
+            sendeConfigAck();
+            erfolg = true; 
+        } else {
+            Serial.printf("JSON Parse Fehler: %s\n", error.c_str());
+        }
+    }
+    http.end();
     return erfolg;
 }
 
 // --- SETUP ---
 void setup() {
     Serial.begin(115200);
+    delay(1000);
 
     WiFi.mode(WIFI_STA);
-    WiFi.disconnect(true); 
-    delay(1000); 
-
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     
     Serial.print("Verbinde mit WiFi ");
@@ -218,6 +264,21 @@ void setup() {
         Serial.print(".");
     }
     Serial.println("\nVerbunden!");
+    Serial.print("IP-Adresse: ");
+    Serial.println(WiFi.localIP());
+
+    // NTP Zeit initialisieren und warten, bis die Zeit da ist
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
+    Serial.print("Synchronisiere Uhrzeit mit NTP");
+
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo, 10000)) {
+        Serial.println();
+        Serial.println("Uhrzeit synchronisiert: " + getFormatiertenZeitstempel());
+    } else {
+        Serial.println();
+        Serial.println("Warnung: NTP-Zeit konnte nicht geladen werden!");
+    }
 }
 
 // --- LOOP ---
@@ -228,15 +289,19 @@ void loop() {
 
             if (!neustartGemeldet) {
                 neustartGemeldet = meldeNeustart();
+                return; 
             }
 
             if (neustartGemeldet) {
                 configGeladen = ladeKonfigurationVomServer();
+                if (configGeladen) {
+                    Serial.println(">>> WECHSEL IN DEN REGULÄREN ARBEITS-LOOP SUCCESSFUL <<<");
+                }
             }
         }
         return; 
     }
-
+    
     unsigned long currentMillis = millis();
     
     anzahlPlaetze = gartenPlaetze.size();
@@ -259,7 +324,7 @@ void loop() {
         platzIndex++;
         if (platzIndex >= anzahlPlaetze) platzIndex = 0;
 
-        lastSensorTime = currentMillis;
+        lastSensorTime = currentMillis; 
     }
 
     // Task 3: Netzwerk
