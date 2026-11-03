@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <vector>
 #include <ArduinoJson.h>
 
@@ -18,23 +19,23 @@ enum connections {
 };
 
 enum StoerungsZustand {
-    FEHLERFREI = 0,  // Umbenannt von OK
+    FEHLERFREI = 0,  
     GEKOMMEN = 1,
     GEMELDET = 2,
     QUITTIERT_ABER_AKTIV = 3
 };
 
 const char *serverUrl[] = {
-    "http://192.168.1.45:8080/api/arduino/data",         // [DATA]
-    "http://192.168.1.45:8080/api/arduino/order",        // [ORDER]
-    "http://192.168.1.45:8080/api/arduino/order/ack",    // [ORDER_ACK]
-    "http://192.168.1.45:8080/api/arduino/alert",        // [ALERT]
-    "http://192.168.1.45:8080/api/arduino/alert/ack",    // [ALERT_ACK]
-    "http://192.168.1.45:8080/api/arduino/configure",    // [CONFIGURE]
-    "http://192.168.1.45:8080/api/arduino/configure/ack" // [CONFIGURE_ACK]
+    "https://throwback-announcer-upfront.ngrok-free.dev/api/arduino/data",         
+    "https://throwback-announcer-upfront.ngrok-free.dev/api/arduino/order",        
+    "https://throwback-announcer-upfront.ngrok-free.dev/api/arduino/order/ack",    
+    "https://throwback-announcer-upfront.ngrok-free.dev/api/arduino/alert",        
+    "https://throwback-announcer-upfront.ngrok-free.dev/api/arduino/alert/ack",    
+    "https://throwback-announcer-upfront.ngrok-free.dev/api/arduino/configure",    
+    "https://throwback-announcer-upfront.ngrok-free.dev/api/arduino/configure/ack" 
 };
 
-const char *rebootUrl = "http://192.168.1.45:8080/api/arduino/reboot";
+const char *rebootUrl = "https://throwback-announcer-upfront.ngrok-free.dev/api/arduino/reboot";
 
 // --- TIMER VARIABLEN ---
 unsigned long lastVentilTime = 0;
@@ -49,7 +50,7 @@ const unsigned long netzwerkIntervall = 10000;
 bool neustartGemeldet = false;
 bool configGeladen = false;
 unsigned long letzterVerbindungsVersuch = 0;
-const unsigned long VERSUCHS_INTERVALL = 10000; // Alle 10 Sekunden neu versuchen
+const unsigned long VERSUCHS_INTERVALL = 10000; 
 
 unsigned int platzIndex = 0;
 unsigned int anzahlPlaetze = 0;
@@ -73,9 +74,8 @@ public:
     int ventilModbusId;
     int ventilLaufzeitMs;
     int sollPosition;
-    StoerungsZustand alarmStatus = FEHLERFREI; // Unser neues "OK"
+    StoerungsZustand alarmStatus = FEHLERFREI; 
 
-    // 1. JSON laden
     bool ladeAusJson(JsonObject platzJson) {
         platzId = platzJson["platzId"];
         platzName = platzJson["platzName"].as<String>();
@@ -94,93 +94,111 @@ public:
         return true;
     }
 
-    // 2. Störungen prüfen
-    void ueberpruefeStoerungen() {
-        bool physikalischerFehler = false;
-        // z.B. Modbus Timeout Check
-        if (physikalischerFehler) {
-            if (alarmStatus == FEHLERFREI) alarmStatus = GEKOMMEN;
-        } else {
-            if (alarmStatus != FEHLERFREI) alarmStatus = FEHLERFREI;
-        }
-    }
-
-    // 3. Platzhalter für Hardware-Aktionen
-    void regleDurchfluss() { /* Modbus Relais steuern */ }
-    void leseSensoren() { /* Modbus Sensoren abfragen */ }
-    void sendeSensorenDaten() { /* HTTP POST an serverUrl[DATA] */ }
-}; // <-- GANZ WICHTIG: Das Semikolon hier am Ende der Klasse!
-
-bool meldeNeustart() {
-    Serial.println("Versuche Wiederanlauf an Backend zu melden...");
-    HTTPClient http;
-    http.begin(rebootUrl);
-    http.addHeader("Content-Type", "application/json");
-
-    String payload = "{\"status\": \"reboot\", \"grund\": \"power_on\"}";
-    int httpCode = http.POST(payload);
-
-    bool erfolg = (httpCode == HTTP_CODE_OK || httpCode == 200);
-    if (erfolg) {
-        Serial.println("Neustart erfolgreich ans Backend gemeldet!");
-    } else {
-        Serial.printf("Backend nicht erreichbar. Code: %d\n", httpCode);
-    }
-    http.end();
-    return erfolg;
-}
+    void ueberpruefeStoerungen() { /* Logik kommt später */ }
+    void regleDurchfluss() { /* Logik kommt später */ }
+    void leseSensoren() { /* Logik kommt später */ }
+    void sendeSensorenDaten() { /* Logik kommt später */ }
+}; 
 
 std::vector<Platz> gartenPlaetze;
 
 // --- NETZWERK FUNKTIONEN ---
 
-void sendeConfigAck() {
-    HTTPClient http;
-    http.begin(serverUrl[CONFIGURE_ACK]);
-    http.addHeader("Content-Type", "application/json");
-
-    String payload = "{\"status\":\"ok\",\"plaetzeKonfiguriert\":" + String(gartenPlaetze.size()) + "}";
-    int httpCode = http.POST(payload);
+bool meldeNeustart() {
+    Serial.println("Versuche Wiederanlauf an Backend zu melden...");
+    WiFiClientSecure *secureClient = new WiFiClientSecure;
     
-    if(httpCode > 0) {
-        Serial.printf("Config-ACK gesendet. HTTP Code: %d\n", httpCode);
-    } else {
-        Serial.printf("Fehler beim Senden des Config-ACK: %s\n", http.errorToString(httpCode).c_str());
+    if (secureClient) {
+        secureClient->setInsecure();     
+        secureClient->setTimeout(15000); 
+        
+        HTTPClient http;
+        http.begin(*secureClient, rebootUrl); 
+        http.addHeader("Content-Type", "application/json");
+        http.addHeader("ngrok-skip-browser-warning", "true"); 
+        
+        String payload = "{\"status\": \"reboot\", \"grund\": \"power_on\"}";
+        int httpCode = http.POST(payload);
+
+        bool erfolg = (httpCode == HTTP_CODE_OK || httpCode == 200 || httpCode == 201);
+        if (erfolg) {
+            Serial.println("Neustart erfolgreich ans Backend gemeldet!");
+        } else {
+            Serial.printf("Backend nicht erreichbar. HTTP Code: %d\n", httpCode);
+        }
+        
+        http.end();
+        delete secureClient; 
+        return erfolg;
     }
-    http.end();
+    return false;
+}
+
+void sendeConfigAck() {
+    WiFiClientSecure *secureClient = new WiFiClientSecure;
+    if (secureClient) {
+        secureClient->setInsecure();
+        secureClient->setTimeout(15000);
+        
+        HTTPClient http;
+        http.begin(*secureClient, serverUrl[CONFIGURE_ACK]);
+        http.addHeader("Content-Type", "application/json");
+        http.addHeader("ngrok-skip-browser-warning", "true");
+
+        String payload = "{\"status\":\"ok\",\"plaetzeKonfiguriert\":" + String(gartenPlaetze.size()) + "}";
+        int httpCode = http.POST(payload);
+        
+        if(httpCode > 0) {
+            Serial.printf("Config-ACK gesendet. HTTP Code: %d\n", httpCode);
+        } else {
+            Serial.printf("Fehler beim Senden des Config-ACK: %d\n", httpCode);
+        }
+        http.end();
+        delete secureClient;
+    }
 }
 
 bool ladeKonfigurationVomServer() {
     Serial.println("Versuche Konfiguration vom Server zu holen...");
-    HTTPClient http;
-    http.begin(serverUrl[CONFIGURE]);
-    int httpCode = http.GET();
-
+    WiFiClientSecure *secureClient = new WiFiClientSecure;
     bool erfolg = false;
-    if (httpCode == HTTP_CODE_OK || httpCode == 200) {
-        String payload = http.getString();
-        DynamicJsonDocument doc(2048);
-        DeserializationError error = deserializeJson(doc, payload);
 
-        if (!error) {
-            gartenPlaetze.clear();
-            JsonArray array = doc.as<JsonArray>();
-            for (JsonObject platzObj : array) {
-                Platz p;
-                p.ladeAusJson(platzObj);
-                gartenPlaetze.push_back(p);
+    if (secureClient) {
+        secureClient->setInsecure();
+        secureClient->setTimeout(15000);
+        
+        HTTPClient http;
+        http.begin(*secureClient, serverUrl[CONFIGURE]);
+        http.addHeader("ngrok-skip-browser-warning", "true");
+        
+        int httpCode = http.GET();
+
+        if (httpCode == HTTP_CODE_OK || httpCode == 200) {
+            String payload = http.getString();
+            DynamicJsonDocument doc(2048);
+            DeserializationError error = deserializeJson(doc, payload);
+
+            if (!error) {
+                gartenPlaetze.clear();
+                JsonArray array = doc.as<JsonArray>();
+                for (JsonObject platzObj : array) {
+                    Platz p;
+                    p.ladeAusJson(platzObj);
+                    gartenPlaetze.push_back(p);
+                }
+                Serial.printf("Erfolgreich %d Plätze konfiguriert!\n", gartenPlaetze.size());
+                sendeConfigAck();
+                erfolg = true; 
+            } else {
+                Serial.printf("JSON Parse Fehler: %s\n", error.c_str());
             }
-            Serial.printf("Erfolgreich %d Plätze konfiguriert!\n", gartenPlaetze.size());
-            sendeConfigAck();
-            erfolg = true; 
         } else {
-            Serial.printf("JSON Parse Fehler: %s\n", error.c_str());
+            Serial.printf("Backend Config Fehler. Code: %d\n", httpCode);
         }
-    } else {
-        Serial.printf("Backend Config Fehler. Code: %d\n", httpCode);
-    }
 
-    http.end();
+        http.end();
+        delete secureClient;
+    }
     return erfolg;
 }
 
@@ -188,20 +206,22 @@ bool ladeKonfigurationVomServer() {
 void setup() {
     Serial.begin(115200);
 
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect(true); 
+    delay(1000); 
+
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    
     Serial.print("Verbinde mit WiFi ");
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
     }
     Serial.println("\nVerbunden!");
-    
-    // meldeNeustart() entfernt! Wird ab jetzt in loop() handled.
 }
 
 // --- LOOP ---
 void loop() {
-    // --- SCHRITT 1: PRÜFEN OB WIR EINE KONFIGURATION HABEN ---
     if (!configGeladen) {
         if (millis() - letzterVerbindungsVersuch >= VERSUCHS_INTERVALL || letzterVerbindungsVersuch == 0) {
             letzterVerbindungsVersuch = millis(); 
@@ -214,14 +234,15 @@ void loop() {
                 configGeladen = ladeKonfigurationVomServer();
             }
         }
-        return; // Abbruch bis Config da ist
+        return; 
     }
 
     unsigned long currentMillis = millis();
-   
+    
+    anzahlPlaetze = gartenPlaetze.size();
     if (anzahlPlaetze == 0) return;
 
-    // --- TASK 1: Schnelle Hardware (Ventile) ---
+    // Task 1: Ventile
     if (currentMillis - lastVentilTime >= ventilIntervall) {
         for (int i = 0; i < anzahlPlaetze; i++) {
             gartenPlaetze[i].regleDurchfluss();
@@ -230,7 +251,7 @@ void loop() {
         lastVentilTime = currentMillis;
     }
 
-    // --- TASK 2: Langsame Hardware (Sensoren & Senden) ---
+    // Task 2: Sensoren
     if (currentMillis - lastSensorTime >= sensorIntervall) {
         gartenPlaetze[platzIndex].leseSensoren();
         gartenPlaetze[platzIndex].sendeSensorenDaten();
@@ -241,7 +262,7 @@ void loop() {
         lastSensorTime = currentMillis;
     }
 
-    // --- TASK 3: Netzwerk (Neue Befehle abholen) ---
+    // Task 3: Netzwerk
     if (currentMillis - lastNetzwerkTime >= netzwerkIntervall) {
         if (WiFi.status() == WL_CONNECTED) {
             // ...
