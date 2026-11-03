@@ -11,9 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -70,28 +67,32 @@ public class ArduinoController {
         return ResponseEntity.ok(antwort);
     }
 
-    // Hilfsmethode für das Event-Logging
-    private void logEvent(String typ, String nachricht) {
-        // Nutzt deinen Konstruktor: category, groupName, plotId, message
-        SystemEventLog event = new SystemEventLog(typ, "SENSORIK", null, nachricht);
-        eventLogRepository.save(event);
-    }
-
-// ... (deine bestehende Klasse)
-
+    // Neuer Endpunkt für die Neustart-Meldung des ESP32
     @PostMapping("/reboot")
     public ResponseEntity<String> handleReboot(@RequestBody RebootRequest request) {
-        // Ausgabe in der Linux-Konsole zur Kontrolle
+        // Mugabe in der Linux-Konsole zur Kontrolle
         System.out.println("Arduino Neustart gemeldet! Status: " + request.status() + ", Grund: " + request.grund());
 
-        // Hier könntest du später z.B. einen Datenbank-Eintrag ("System neu gestartet") anlegen.
+        // Optional: Event direkt in die Datenbank loggen
+        logEvent("INFO", "ESP32 Neustart gemeldet. Grund: " + request.grund());
 
-        // Wichtig für den ESP32: Er wartet auf ein HTTP 200 (OK)
+        // Wichtig für den ESP32: Er wartet auf ein erfolgreiches HTTP 200 (OK)
         return ResponseEntity.ok("{\"status\":\"ok\"}");
     }
 
-// ... (Ende deiner Klasse)
+    @PostMapping("/configure/ack")
+    public ResponseEntity<String> handleConfigAck(@RequestBody String payload) {
+        // Hier kannst du das JSON verarbeiten oder einfach nur loggen
+        System.out.println("Config-ACK empfangen: " + payload);
+        return ResponseEntity.ok("ACK erhalten");
+    }
+
+    // Hilfsmethode für das Event-Logging
+    private void logEvent(String typ, String nachricht) {
+        SystemEventLog event = new SystemEventLog(typ, "SENSORIK", null, nachricht);
+        eventLogRepository.save(event);
+    }
 }
 
-// Wenn du aktuelles Java nutzt (Java 14+), ist das die kürzeste Form für ein Datenobjekt:
+// Datenobjekt (Record) für den JSON-Empfang des Neustarts
 record RebootRequest(String status, String grund) {}

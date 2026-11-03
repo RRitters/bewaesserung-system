@@ -37,3 +37,6 @@ Sensor 35 cm Tiefe		ID 2	Liefert Feuchtigkeit der Hauptwurzel-Zone
 Impulszähler (Durchfluss)	ID 3	Speichert die durchgelaufenen Liter Wasser
 Relais-Modul (Ventil)		ID 4	Öffnet / schließt die 24V-Zuleitung zum Kugelhahn
 
+
+ngrok Identtoken: 3KvucKCqBcWji6ZW2siyHBF1f5I_5kPBSWt5qEx1G44Lx2Kup
+
