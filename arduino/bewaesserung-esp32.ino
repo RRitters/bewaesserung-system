@@ -60,10 +60,48 @@ unsigned int anzahlPlaetze = 0;
 
 const char* ntpServer1 = "pool.ntp.org";
 const char* ntpServer2 = "time.nist.gov";
-const long  gmtOffset_sec = 3600;     // 1 Stunde für MEZ (bzw. 7200 für Sommerzeit / MESZ)
-const int   daylightOffset_sec = 3600; // Sommerzeit-Offset in Sekunden (wird addiert, wenn aktiv)
+const long  gmtOffset_sec = 25200;     // 7 Stunde für MEZ (bzw. 7200 für Sommerzeit / MESZ)
+const int   daylightOffset_sec = 0; // Sommerzeit-Offset in Sekunden (wird addiert, wenn aktiv)
 
-// --- ZEIT & NTP FUNKTIONEN (JETZT WIEDER GLOBAL) ---
+// --- 
+
+// --- LOKALES ZEIT-FALLBACK VOM RASPBERRY PI ---
+bool holeZeitVomRaspberry() {
+    Serial.println("Versuche lokale Zeit vom Raspberry Pi zu holen...");
+    
+    WiFiClient client; // Ganz normaler Client fürs lokale Netz (kein Secure/HTTPS nötig)
+    HTTPClient http;
+    
+    // IP-Adresse deines Raspberry Pi im lokalen Netzwerk anpassen!
+    String piUrl = "http://192.168.1.100:8080/api/arduino/time";
+    
+    if (http.begin(client, piUrl)) {
+        int httpCode = http.GET();
+        if (httpCode == HTTP_CODE_OK) {
+            String payload = http.getString();
+            
+            // JSON parsen
+            JsonDocument doc;
+            DeserializationError error = deserializeJson(doc, payload);
+            if (!error) {
+                unsigned long epochMillis = doc["epochMillis"];
+                
+                // Zeit manuell im ESP32 System-Timer setzen
+                struct timeval tv;
+                tv.tv_sec = epochMillis / 1000;
+                tv.tv_usec = (epochMillis % 1000) * 1000;
+                settimeofday(&tv, NULL);
+                
+                Serial.println("Erfolgreich lokale Zeit vom Raspberry Pi übernommen!");
+                http.end();
+                return true;
+            }
+        }
+        http.end();
+    }
+    Serial.println("Fehler beim Abrufen der lokalen Raspberry-Zeit!");
+    return false;
+}
 
 unsigned long getMillisekundenTimestamp() {
     struct timeval tv;
@@ -251,6 +289,7 @@ bool ladeKonfigurationVomServer() {
 }
 
 // --- SETUP ---
+// --- SETUP ---
 void setup() {
     Serial.begin(115200);
     delay(1000);
@@ -267,17 +306,26 @@ void setup() {
     Serial.print("IP-Adresse: ");
     Serial.println(WiFi.localIP());
 
-    // NTP Zeit initialisieren und warten, bis die Zeit da ist
-    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
-    Serial.print("Synchronisiere Uhrzeit mit NTP");
-
-    struct tm timeinfo;
-    if (getLocalTime(&timeinfo, 10000)) {
-        Serial.println();
-        Serial.println("Uhrzeit synchronisiert: " + getFormatiertenZeitstempel());
+    // --- SICHERE ZEIT-SYNCHRONISATION (OHNE CRASH) ---
+    // Wir versuchen zuerst das lokale Fallback zum Raspberry Pi.
+    // Das schützt uns sofort, wenn das Internet (wie in Thailand üblich) tot ist.
+    Serial.println("Versuche Zeit vom lokalen Raspberry Pi zu holen...");
+    
+    if (holeZeitVomRaspberry()) {
+        Serial.println("Uhrzeit via Raspberry Pi synchronisiert: " + getFormatiertenZeitstempel());
     } else {
-        Serial.println();
-        Serial.println("Warnung: NTP-Zeit konnte nicht geladen werden!");
+        Serial.println("Raspberry Pi nicht erreichbar. Versuche Internet-NTP...");
+        
+        // Erst wenn der Pi nicht da ist, versuchen wir das Internet (mit konfiguriertem Offset)
+        configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
+        
+        struct tm timeinfo;
+        // Kurzer Versuch (max 3 Sekunden), um Hänger zu vermeiden
+        if (getLocalTime(&timeinfo, 3000)) {
+            Serial.println("Uhrzeit via Internet synchronisiert: " + getFormatiertenZeitstempel());
+        } else {
+            Serial.println("WARNUNG: Weder Internet noch Raspberry Pi erreichbar! Uhrzeit läuft ab Start-Null.");
+        }
     }
 }
 
