@@ -9,6 +9,7 @@ public class EvaluateMiddleAreaStateDelegate implements JavaDelegate {
 
     @Override
     public void execute(DelegateExecution execution) throws Exception {
-        System.out.println(">>> Ausgeführt: evaluateMiddleAreaStateDelegate (Instanz: " + execution.getProcessInstanceId() + ")");
+        System.out.println(">>> Ausgeführt: evaluateMiddleAreaStateDelegate -> setzt isMiddleArea = false");
+        execution.setVariable("isMiddleArea", false);
     }
 }

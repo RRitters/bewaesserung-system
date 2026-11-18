@@ -47,7 +47,21 @@ public class Platz {
     @Column(name = "QUEUE_STATUS")
     private String queueStatus = "IDLE";
 
-    // Der Platz kennt alle seine Sensoren (Unidirektional über JoinColumn)
+    public Double getFeuchte10Cm() {
+        return feuchte10Cm;
+    }
+
+    public void setFeuchte10Cm(Double feuchte10Cm) {
+        this.feuchte10Cm = feuchte10Cm;
+    }
+
+    @Column(name = "FEUCHTE_10CM")
+    private Double feuchte10Cm;
+
+    @Column(name = "FEUCHTE_35CM")
+    private Double feuchte35Cm;
+
+    // Getter & Setter dazu generieren (Alt + Einfg in IntelliJ)    // Der Platz kennt alle seine Sensoren (Unidirektional über JoinColumn)
     @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @JoinColumn(name = "platz_id")
     private List<Sensor> sensoren = new ArrayList<>();

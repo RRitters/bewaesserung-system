@@ -9,6 +9,7 @@ public class EvaluateDurianStateDelegate implements JavaDelegate {
 
     @Override
     public void execute(DelegateExecution execution) throws Exception {
-        System.out.println(">>> Ausgeführt: evaluateDurianStateDelegate (Instanz: " + execution.getProcessInstanceId() + ")");
+        System.out.println(">>> Ausgeführt: evaluateDurianStateDelegate -> setzt isDurian = true");
+        execution.setVariable("isDurian", true);
     }
 }

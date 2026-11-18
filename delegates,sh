@@ -1,0 +1,43 @@
+DIR="src/main/java/com/example/bewaesserung/service"
+mkdir -p "$DIR"
+
+DELEGATES=(
+  "checkPlaceRequestDelegate"
+  "closeReadyValvesDelegate"
+  "durianQueueControlDelegate"
+  "errorMessageDelegate"
+  "evaluateDurianStateDelegate"
+  "evaluateGardenStateDelegate"
+  "evaluateMiddleAreaStateDelegate"
+  "getSensorDataDelegate"
+  "openNextValvesDelegate"
+  "refillHighTankDelegate"
+  "setupDurianPumpsAndValvesDelegate"
+  "setupGardenPumpsAndValvesDelegate"
+  "setupMiddleAreaPumpsAndValvesDelegate"
+  "stopDurianPumpsAndValvesDelegate"
+  "stopGardenPumpsAndValvesDelegate"
+  "stopMiddleAreaPumpsAndValvesDelegate"
+  "waterGardenDelegate"
+  "waterMiddleAreaDelegate"
+)
+
+for bean in "${DELEGATES[@]}"; do
+  className="$(tr '[:lower:]' '[:upper:]' <<< ${bean:0:1})${bean:1}"
+  cat <<EOF > "$DIR/${className}.java"
+package com.example.bewaesserung.service;
+
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+import org.springframework.stereotype.Component;
+
+@Component("$bean")
+public class ${className} implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) throws Exception {
+        System.out.println(">>> Ausgeführt: $bean (Instanz: " + execution.getProcessInstanceId() + ")");
+    }
+}
+EOF
+done

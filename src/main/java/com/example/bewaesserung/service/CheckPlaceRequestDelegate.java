@@ -9,6 +9,7 @@ public class CheckPlaceRequestDelegate implements JavaDelegate {
 
     @Override
     public void execute(DelegateExecution execution) throws Exception {
-        System.out.println(">>> Ausgeführt: checkPlaceRequestDelegate (Instanz: " + execution.getProcessInstanceId() + ")");
+        System.out.println(">>> Ausgeführt: checkPlaceRequestDelegate -> setzt hasRequest = true");
+        execution.setVariable("hasRequest", true);
     }
 }

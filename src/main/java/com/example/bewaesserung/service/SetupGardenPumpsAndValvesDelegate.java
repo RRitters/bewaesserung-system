@@ -9,6 +9,7 @@ public class SetupGardenPumpsAndValvesDelegate implements JavaDelegate {
 
     @Override
     public void execute(DelegateExecution execution) throws Exception {
-        System.out.println(">>> Ausgeführt: setupGardenPumpsAndValvesDelegate (Instanz: " + execution.getProcessInstanceId() + ")");
+        System.out.println(">>> Ausgeführt: setupGardenPumpsAndValvesDelegate -> setzt setupOk = true");
+        execution.setVariable("setupOk", true);
     }
 }
