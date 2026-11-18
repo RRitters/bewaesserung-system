@@ -1,9 +1,8 @@
 package com.example.bewaesserung.model;
-//package com.deinpaket.model;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "ventile")
@@ -25,15 +24,29 @@ public class Ventil {
 
     // Steuer-Parameter (0 - 100%)
     @Column(name = "SOLL_POSITION")
-    private Integer sollPosition;
+    private Integer sollPosition = 0;
 
     @Column(name = "IST_POSITION")
-    private Integer istPosition;
+    private Integer istPosition = 0;
 
-    // Hardware-Anbindung (Modbus oder direkte Pins am Arduino)
+    // Expliziter Status: "CLOSED", "OPEN", "OPENING", "CLOSING", "UNKNOWN"
+    @Column(name = "STATUS")
+    private String status = "UNKNOWN";
+
+    // true = beim Systemstart / Neuanlauf zwingend einmal komplett zufahren
+    @Column(name = "INIT_CLOSE_ON_BOOT")
+    private boolean initCloseOnBoot = true;
+
+    // Zeitstempel der letzten Bewegung
+    @Column(name = "LETZTE_AKTION")
+    private LocalDateTime letzteAktion;
+
+    // Hardware-Anbindung (Modbus oder direkte Pins am ESP32/Arduino)
     private Integer modbusId;
+
     @Column(name = "REGISTER_AUF")
     private Integer registerAuf; // Relais 1 zieht an -> Ventil öffnet
+
     @Column(name = "REGISTER_ZU")
     private Integer registerZu;  // Relais 2 zieht an -> Ventil schließt
 
@@ -42,14 +55,7 @@ public class Ventil {
     @JsonIgnore
     private Platz platz;
 
-    // Zugehörigkeit zum Platz
-//    @ManyToOne
-//    @JoinColumn(name = "platz_id")
-//    @JsonBackReference
-//    private Platz platz;
-
     // --- Getter und Setter ---
-
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -67,6 +73,15 @@ public class Ventil {
 
     public Integer getIstPosition() { return istPosition; }
     public void setIstPosition(Integer istPosition) { this.istPosition = istPosition; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public boolean isInitCloseOnBoot() { return initCloseOnBoot; }
+    public void setInitCloseOnBoot(boolean initCloseOnBoot) { this.initCloseOnBoot = initCloseOnBoot; }
+
+    public LocalDateTime getLetzteAktion() { return letzteAktion; }
+    public void setLetzteAktion(LocalDateTime letzteAktion) { this.letzteAktion = letzteAktion; }
 
     public Integer getModbusId() { return modbusId; }
     public void setModbusId(Integer modbusId) { this.modbusId = modbusId; }

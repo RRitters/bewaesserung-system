@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "PLATZ")
@@ -27,6 +26,26 @@ public class Platz {
     // true = Baum wird auf Blüte vorbereitet (Trockenstress zulassen)
     // false = normales Wachstum
     private boolean inBluetenPhase;
+
+    // Bereich: "DURIAN", "GARDEN", "MIDDLE_AREA"
+    @Column(name = "BEREICH")
+    private String bereich;
+
+    // Priorität für die Queue (1 = höchste Priorität, 5 = niedrigste)
+    @Column(name = "PRIORITAET")
+    private Integer prioritaet = 3;
+
+    // Gewünschte Wassermenge in Litern für den aktuellen Zyklus
+    @Column(name = "SOLL_LITER")
+    private Double sollLiter = 0.0;
+
+    // Bisher abgeflossene Liter in diesem Zyklus
+    @Column(name = "IST_LITER")
+    private Double istLiter = 0.0;
+
+    // Status in der Queue: "IDLE", "QUEUED", "WATERING", "FINISHED"
+    @Column(name = "QUEUE_STATUS")
+    private String queueStatus = "IDLE";
 
     // Der Platz kennt alle seine Sensoren (Unidirektional über JoinColumn)
     @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
@@ -61,7 +80,22 @@ public class Platz {
 
     public boolean isInBluetenPhase() { return inBluetenPhase; }
     public void setInBluetenPhase(boolean inBluetenPhase) { this.inBluetenPhase = inBluetenPhase; }
-    // ... (und ganz unten die Getter/Setter dafür einfügen:)
+
+    public String getBereich() { return bereich; }
+    public void setBereich(String bereich) { this.bereich = bereich; }
+
+    public Integer getPrioritaet() { return prioritaet; }
+    public void setPrioritaet(Integer prioritaet) { this.prioritaet = prioritaet; }
+
+    public Double getSollLiter() { return sollLiter; }
+    public void setSollLiter(Double sollLiter) { this.sollLiter = sollLiter; }
+
+    public Double getIstLiter() { return istLiter; }
+    public void setIstLiter(Double istLiter) { this.istLiter = istLiter; }
+
+    public String getQueueStatus() { return queueStatus; }
+    public void setQueueStatus(String queueStatus) { this.queueStatus = queueStatus; }
+
     public List<Sensor> getSensoren() { return sensoren; }
     public void setSensoren(List<Sensor> sensoren) { this.sensoren = sensoren; }
 
@@ -69,12 +103,11 @@ public class Platz {
         return ventile;
     }
 
-    // Neuer, intelligenter Setter, der die Verknüpfung automatisch setzt
     public void setVentile(List<Ventil> ventile) {
         this.ventile = ventile;
         if (this.ventile != null) {
             for (Ventil v : this.ventile) {
-                v.setPlatz(this); // Sagt dem Ventil: "Ich bin dein Platz!"
+                v.setPlatz(this);
             }
         }
     }
