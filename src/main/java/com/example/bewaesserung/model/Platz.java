@@ -58,6 +58,14 @@ public class Platz {
     @Column(name = "FEUCHTE_10CM")
     private Double feuchte10Cm;
 
+    public Double getFeuchte35Cm() {
+        return feuchte35Cm;
+    }
+
+    public void setFeuchte35Cm(Double feuchte35Cm) {
+        this.feuchte35Cm = feuchte35Cm;
+    }
+
     @Column(name = "FEUCHTE_35CM")
     private Double feuchte35Cm;
 
