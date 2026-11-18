@@ -32,6 +32,7 @@
       <bpmn:incoming>Flow_1k6dugl</bpmn:incoming>
       <bpmn:incoming>Flow_1etmi2w</bpmn:incoming>
       <bpmn:incoming>Flow_0cih560</bpmn:incoming>
+      <bpmn:incoming>Flow_0zuwole</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_To_Sensoren" name="Yes" sourceRef="Gateway_1m6fr8l" targetRef="Activity_Sensoren" />
     <bpmn:sequenceFlow id="Flow_To_Timer" sourceRef="Activity_058k28s" targetRef="Gateway_00iz740" />
@@ -60,6 +61,7 @@
     <bpmn:exclusiveGateway id="Gateway_0v5652s" name="Time to Start ?">
       <bpmn:incoming>Flow_09msmzh</bpmn:incoming>
       <bpmn:outgoing>Flow_1wgjugc</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0zuwole</bpmn:outgoing>
     </bpmn:exclusiveGateway>
     <bpmn:sequenceFlow id="Flow_09msmzh" sourceRef="Activity_1fg0ied" targetRef="Gateway_0v5652s" />
     <bpmn:task id="Activity_1x1mypg" name="Any Request from a Place ?">
@@ -206,6 +208,7 @@
     <bpmn:sequenceFlow id="Flow_0bwc9gb" sourceRef="Activity_1m9geh0" targetRef="Activity_1lpdr86" />
     <bpmn:sequenceFlow id="Flow_0cih560" name="No" sourceRef="Gateway_1efs0uz" targetRef="EndEvent_1" />
     <bpmn:sequenceFlow id="Flow_02255bg" sourceRef="Activity_Sensoren" targetRef="Gateway_Entscheidung" />
+    <bpmn:sequenceFlow id="Flow_0zuwole" name="No" sourceRef="Gateway_0v5652s" targetRef="EndEvent_1" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="bewaesserung_platz">
@@ -598,6 +601,14 @@
       <bpmndi:BPMNEdge id="Flow_02255bg_di" bpmnElement="Flow_02255bg">
         <di:waypoint x="950" y="460" />
         <di:waypoint x="950" y="512" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0zuwole_di" bpmnElement="Flow_0zuwole">
+        <di:waypoint x="430" y="142" />
+        <di:waypoint x="430" y="1220" />
+        <di:waypoint x="672" y="1220" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="438" y="678" width="15" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
