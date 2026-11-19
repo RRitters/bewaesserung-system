@@ -42,10 +42,13 @@ public class ArduinoController {
 
         // 2. Messwert erstellen und speichern
         Messwert messwert = new Messwert();
-        messwert.setSensorId(sensor.getId());
-        messwert.setWert(data.getWert());
-        messwert.setEinheit(sensor.getEinheit());
-        messwert.setGemessenAm(LocalDateTime.now());
+        messwert.setPlatzId(1L);
+        messwert.setGemessenAm(LocalDateTime.now().withNano(0));
+        messwert.setBodenFeuchte(25.1);       // Statt setWert(...)
+        messwert.setBodenTemperatur(27.3);    // Statt setWert(...)
+        messwert.setLuftTemperatur(22.0);     // Neu
+        messwert.setLuftFeuchte(65.0);        // Neu
+        messwert.setDurchfluss(0.0);
         messwertRepository.save(messwert);
 
         // 3. Schwellwert-Logik (Das Gehirn)

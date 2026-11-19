@@ -22,25 +22,28 @@ public class MesswertController {
 
     @GetMapping("/sensor/{sensorId}")
     public List<Messwert> getMesswerteBySensor(@PathVariable Long sensorId) {
-        return repository.findBySensorIdOrderByGemessenAmDesc(sensorId);
+        return repository.findTop5ByPlatzIdOrderByGemessenAmDesc(sensorId);
     }
 
     @PostMapping
     public Messwert createMesswert(@RequestBody Messwert messwert) {
         if (messwert.getGemessenAm() == null) {
-            messwert.setGemessenAm(LocalDateTime.now());
+            messwert.setGemessenAm(LocalDateTime.now().withNano(0));
         }
         return repository.save(messwert);
     }
 
-    // Dein übernommener und angepasster Test-Endpunkt
+    // Angepasster Test-Endpunkt für das neue kompakte Modell
     @GetMapping("/generate")
     public Messwert generateDummyMeasurement() {
         Messwert m = new Messwert();
-        m.setSensorId(1L); // Passt perfekt zu deinem Sensor mit ID 1
-        m.setWert(42.5);
-        m.setEinheit("%");
-        m.setGemessenAm(LocalDateTime.now());
+        m.setPlatzId(1L); // Platz-ID statt Sensor-ID
+        m.setBodenFeuchte(42.5); // Bodenfeuchte statt setWert
+        m.setBodenTemperatur(25.0);
+        m.setLuftTemperatur(23.5);
+        m.setLuftFeuchte(60.0);
+        m.setDurchfluss(0.0);
+        m.setGemessenAm(LocalDateTime.now().withNano(0));
         return repository.save(m);
     }
 }

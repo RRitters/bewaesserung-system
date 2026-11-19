@@ -2,7 +2,6 @@ package com.example.bewaesserung.mock;
 
 import com.example.bewaesserung.model.Messwert;
 import com.example.bewaesserung.model.Platz;
-import com.example.bewaesserung.model.Sensor;
 import com.example.bewaesserung.repository.MesswertRepository;
 import com.example.bewaesserung.repository.PlatzRepository;
 import org.camunda.bpm.engine.delegate.DelegateExecution;
@@ -42,7 +41,7 @@ public class GetSensorDataDelegate implements JavaDelegate {
         int schliessenPrioritaetCount = 0;
         int gespeicherteMesswerte = 0;
 
-        LocalDateTime jetzt = LocalDateTime.now();
+        LocalDateTime jetzt = LocalDateTime.now().withNano(0); // Auf volle Sekunden gekürzt
 
         for (Platz platz : allePlaetze) {
             String status = platz.getQueueStatus() != null ? platz.getQueueStatus().toUpperCase() : "IDLE";
@@ -94,21 +93,29 @@ public class GetSensorDataDelegate implements JavaDelegate {
                 anzahlTrocken++;
             }
 
-            // Alle zugehörigen Sensoren des Platzes direkt in MESSWERTE speichern
-            if (platz.getSensoren() != null) {
-                for (Sensor sensor : platz.getSensoren()) {
-                    double wert = berechneSensorWert(sensor.getName(), f10, f35, ventilOffen);
+            // NEU: Genau EINE kompakte Messwert-Zeile pro Platz und Zyklus speichern
+            Messwert messwert = new Messwert();
+            messwert.setPlatzId(platz.getId());
+            messwert.setGemessenAm(jetzt);
 
-                    Messwert messwert = new Messwert();
-                    messwert.setSensorId(sensor.getId()); // Verknüpfung über die ID des Sensors
-                    messwert.setWert(wert);
-                    messwert.setEinheit(sensor.getEinheit());
-                    messwert.setGemessenAm(jetzt);
+            // Bodendaten
+            messwert.setBodenFeuchte(f10);
+            messwert.setBodenTemperatur(runden(26.5 + (random.nextDouble() * 3.0) - (ventilOffen ? 1.5 : 0.0)));
+            messwert.setEcWert(runden(850.0 + (random.nextDouble() * 250.0)));
+            messwert.setPhWert(runden(6.2 + (random.nextDouble() * 0.6)));
+            messwert.setStickstoff(runden(45.0 + (random.nextDouble() * 15.0)));
+            messwert.setPhosphor(runden(20.0 + (random.nextDouble() * 10.0)));
+            messwert.setKalium(runden(110.0 + (random.nextDouble() * 30.0)));
 
-                    messwertRepository.save(messwert);
-                    gespeicherteMesswerte++;
-                }
-            }
+            // Kleinklima (z. B. unter Bananenstauden / Bambus)
+            messwert.setLuftTemperatur(runden(28.0 + (random.nextDouble() * 4.0)));
+            messwert.setLuftFeuchte(runden(65.0 + (random.nextDouble() * 15.0)));
+
+            // Durchfluss
+            messwert.setDurchfluss(ventilOffen ? runden(4.2 + random.nextDouble() * 0.6) : 0.0);
+
+            messwertRepository.save(messwert);
+            gespeicherteMesswerte++;
         }
 
         boolean bodenZuTrocken = anzahlTrocken > 0;
@@ -121,18 +128,7 @@ public class GetSensorDataDelegate implements JavaDelegate {
         ));
     }
 
-    private double berechneSensorWert(String sensorName, double f10, double f35, boolean ventilOffen) {
-        if (sensorName == null) return 0.0;
-        double wert = switch (sensorName.toUpperCase()) {
-            case "FEUCHTE_10CM" -> f10;
-            case "FEUCHTE_35CM" -> f35;
-            case "TEMP_10CM" -> 26.5 + (random.nextDouble() * 3.0) - (ventilOffen ? 1.5 : 0.0);
-            case "TEMP_35CM" -> 24.0 + (random.nextDouble() * 1.5);
-            case "EC_10CM" -> 850.0 + (random.nextDouble() * 250.0);
-            case "EC_35CM" -> 920.0 + (random.nextDouble() * 200.0);
-            case "DURCHFLUSS" -> ventilOffen ? (4.2 + random.nextDouble() * 0.6) : 0.0;
-            default -> 0.0;
-        };
+    private double runden(double wert) {
         return Math.round(wert * 10.0) / 10.0;
     }
 }
