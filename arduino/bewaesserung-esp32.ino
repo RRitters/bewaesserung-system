@@ -37,6 +37,19 @@ String serverUrl[] = {
 
 String piUrl = serverBaseUrl + "/api/arduino/time";
 
+// --- SENSOR-TYPEN & ADRESSPLAN (1..19 Sensoren, >=20 Ausgaben/Relais) ---
+enum SensorTypId : uint16_t {
+    TYP_ID_SOIL_2IN1 = 1, // ComWinTop TH-S (10 cm)
+    TYP_ID_SOIL_7IN1 = 2, // ComWinTop NPKPHCTH-S (35 cm)
+    TYP_ID_AIR       = 3, // Luftfeuchte & Lufttemperatur
+    TYP_ID_FLOW      = 4  // Durchfluss / Impulszähler
+};
+
+struct SensorSlot {
+    uint16_t typId;
+    uint8_t  modbusAddr;
+};
+
 // --- ZEIT & NTP VARIABLEN ---
 const long  gmtOffset_sec = 25200;      // UTC +7 für Thailand (7 * 3600)
 const int   daylightOffset_sec = 0;
@@ -76,19 +89,19 @@ String getFormatiertenZeitstempel() {
     time_t nowSecs = tv.tv_sec + (7 * 3600);
 
     struct tm timeinfo;
-    gmtime_r(&nowSecs, &timeinfo); // gmtime statt localtime, da der Offset schon eingerechnet ist
+    gmtime_r(&nowSecs, &timeinfo);
 
     int millisec = tv.tv_usec / 1000;
 
     char buffer[64];
     snprintf(buffer, sizeof(buffer), "%04d.%02d.%02d %02d:%02d:%02d.%03d",
-            timeinfo.tm_year + 1900,
-            timeinfo.tm_mon + 1,
-            timeinfo.tm_mday,
-            timeinfo.tm_hour,
-            timeinfo.tm_min,
-            timeinfo.tm_sec,
-            millisec);
+             timeinfo.tm_year + 1900,
+             timeinfo.tm_mon + 1,
+             timeinfo.tm_mday,
+             timeinfo.tm_hour,
+             timeinfo.tm_min,
+             timeinfo.tm_sec,
+             millisec);
 
     return String(buffer);
 }
@@ -105,39 +118,42 @@ bool holeZeitVomRaspberry() {
         DeserializationError error = deserializeJson(doc, payload);
 
         if (!error) {
-            unsigned long epochTime = doc["epochSecond"];
-            struct timeval tv;
-            tv.tv_sec = epochTime;
-            tv.tv_usec = 0;
-            settimeofday(&tv, NULL);
-            erfolg = true;
+            unsigned long epochTime = doc["epochSecond"] | 0UL;
+            if (epochTime > 0) {
+                struct timeval tv;
+                tv.tv_sec = epochTime;
+                tv.tv_usec = 0;
+                settimeofday(&tv, NULL);
+                erfolg = true;
+            }
         }
     }
     http.end();
     return erfolg;
 }
 
-// --- NEUE DURCHFLUSSSTEUERUNGS-KLASSE ---
+// --- DURCHFLUSSSTEUERUNGS-KLASSE ---
 class Durchflusssteuerung {
 private:
     int ventilModbusId;
     float sollDurchflussLpm;
     float istDurchflussLpm;
     float minSprenklerLpm;
-    const float MAX_DURCHFLUSS = 30.0; // Obergrenze (Leckageschutz)
-    int aktuelleStufe = 0;             // 0 (zu) bis 20 (voll offen)
+    const float MAX_DURCHFLUSS = 30.0f; // Obergrenze (Leckageschutz)
+    int aktuelleStufe = 0;              // 0 (zu) bis 20 (voll offen)
 
 public:
     Durchflusssteuerung() {
         ventilModbusId = 0;
-        sollDurchflussLpm = 0.0;
-        istDurchflussLpm = 0.0;
-        minSprenklerLpm = 5.0; // Standard-Minimum für Sprenkler
+        sollDurchflussLpm = 0.0f;
+        istDurchflussLpm = 0.0f;
+        minSprenklerLpm = 6.0f;
     }
 
     void initialisiere(int vId, float minLpm) {
         ventilModbusId = vId;
         minSprenklerLpm = minLpm;
+        aktuelleStufe = 0;
     }
 
     void setSollDurchfluss(float soll) {
@@ -150,26 +166,26 @@ public:
 
     // Wird alle 500ms aufgerufen (entspricht einem von 20 Schritten für die 10s Laufzeit)
     void updateRegelung() {
+        if (ventilModbusId <= 0) return;
+
         if (istDurchflussLpm > MAX_DURCHFLUSS) {
-            Serial.printf("[ALARM] Ventil Modbus %d: Durchfluss mit %.1f l/min über Max-Grenze (30 l/min)!\n",
+            Serial.printf("[ALARM] Ventil Modbus %d: Durchfluss mit %.1f l/min ueber Max-Grenze (30 l/min)!\n",
                           ventilModbusId, istDurchflussLpm);
             schliesseNotfall();
             return;
         }
 
-        if (sollDurchflussLpm <= 0.0) {
+        if (sollDurchflussLpm <= 0.0f) {
             if (aktuelleStufe > 0) {
                 aktuelleStufe--;
-                // Modbus Befehl zum schrittweisen Schließen senden
-                Serial.printf("Ventil %d schließt weiter (Stufe %d/20)...\n", ventilModbusId, aktuelleStufe);
+                Serial.printf("Ventil %d schliesst weiter (Stufe %d/20)...\n", ventilModbusId, aktuelleStufe);
             }
             return;
         }
 
-        // Regelkreis-Anpassung im 500ms-Takt
         if (istDurchflussLpm < sollDurchflussLpm && aktuelleStufe < 20) {
             aktuelleStufe++;
-            Serial.printf("Ventil %d öffnet einen Schritt (Stufe %d/20) | Ist: %.1f / Soll: %.1f l/min\n",
+            Serial.printf("Ventil %d oeffnet einen Schritt (Stufe %d/20) | Ist: %.1f / Soll: %.1f l/min\n",
                           ventilModbusId, aktuelleStufe, istDurchflussLpm, sollDurchflussLpm);
         } else if (istDurchflussLpm > sollDurchflussLpm && aktuelleStufe > 0) {
             aktuelleStufe--;
@@ -181,51 +197,73 @@ public:
 private:
     void schliesseNotfall() {
         aktuelleStufe = 0;
-        // Sofort-Stopp Befehl an Ventil senden
+        Serial.printf("[NOTFALL] Ventil Modbus %d sofort geschlossen (Stufe 0/20).\n", ventilModbusId);
     }
 };
 
 // --- KLASSEN DEFINITIONEN ---
 class Platz {
 public:
-    int platzId;
+    int platzId = 0;
     String platzName;
-    std::vector<int> sensorModbusIds;
-    int ventilModbusId;
-    int ventilLaufzeitMs;
-    int sollPosition;
+    std::vector<SensorSlot> sensorSlots;
+    int ventilModbusId = 0;
+    int ventilLaufzeitMs = 0;
+    float sollDurchflussLpm = 0.0f;
 
-    // Das Steuerungsobjekt direkt als Member
     Durchflusssteuerung durchflussRegler;
-
     StoerungsZustand alarmStatus = FEHLERFREI;
 
     bool ladeAusJson(JsonObject platzJson) {
-        platzId = platzJson["platzId"];
-        platzName = platzJson["platzName"].as<String>();
+        platzId = platzJson["platzId"] | 0;
+        platzName = platzJson["platzName"] | "";
 
-        sensorModbusIds.clear();
-        JsonArray modbusArray = platzJson["sensorModbusIds"];
-        for (int id : modbusArray) {
-            sensorModbusIds.push_back(id);
+        sensorSlots.clear();
+        JsonArray slotsArray = platzJson["slots"].as<JsonArray>();
+        if (!slotsArray.isNull()) {
+            for (JsonObject slotObj : slotsArray) {
+                uint16_t typId = slotObj["typId"] | 0;
+                uint8_t addr   = slotObj["modbusAddr"] | 0;
+
+                if (typId > 0 && addr >= 1 && addr <= 19) {
+                    sensorSlots.push_back({typId, addr});
+                } else if (addr > 0) {
+                    Serial.printf("[WARN] Platz %d: Sensor-Modbus %u ausserhalb 1..19 ignoriert\n",
+                                  platzId, addr);
+                }
+            }
         }
 
-        ventilModbusId = platzJson["ventilModbusId"];
-        ventilLaufzeitMs = platzJson["ventilLaufzeitMs"];
-        sollPosition = platzJson["sollPosition"];
+        JsonObject ventilObj = platzJson["ventil"].as<JsonObject>();
+        float minLpm = 6.0f;
+        if (!ventilObj.isNull()) {
+            ventilModbusId    = ventilObj["modbusId"] | 0;
+            ventilLaufzeitMs  = ventilObj["laufzeitMs"] | 0;
+            sollDurchflussLpm = ventilObj["sollDurchflussLpm"] | 0.0f;
+            minLpm            = ventilObj["minDurchflussLpm"] | 6.0f;
+        } else {
+            // Fallback auf älteres flaches JSON-Format
+            ventilModbusId    = platzJson["ventilModbusId"] | 0;
+            ventilLaufzeitMs  = platzJson["ventilLaufzeitMs"] | 0;
+            sollDurchflussLpm = platzJson["sollPosition"] | 0.0f;
+        }
 
-        // Durchflussregler mit Ventil-ID und einem angenommenen Sprenkler-Minimum initialisieren
-        durchflussRegler.initialisiere(ventilModbusId, 6.0); // z.B. 6 l/min Minimum
-        durchflussRegler.setSollDurchfluss((float)sollPosition);
+        if (ventilModbusId > 0 && ventilModbusId < 20) {
+            Serial.printf("[WARN] Platz %d: Ventil-Modbus %d liegt unter 20 (Ausgaben ab 20 geplant)\n",
+                          platzId, ventilModbusId);
+        }
 
-        Serial.printf("Platz %s (ID: %d) geladen. Ventil-Modbus: %d\n", platzName.c_str(), platzId, ventilModbusId);
+        durchflussRegler.initialisiere(ventilModbusId, minLpm);
+        durchflussRegler.setSollDurchfluss(sollDurchflussLpm);
+
+        Serial.printf("Platz %s (ID: %d) geladen | Slots: %d | Ventil-Modbus: %d\n",
+                      platzName.c_str(), platzId, (int)sensorSlots.size(), ventilModbusId);
         return true;
     }
 
     void ueberpruefeStoerungen() { /* Logik folgt */ }
 
     void regleDurchfluss() {
-        // Wird alle 500 ms aufgerufen
         durchflussRegler.updateRegelung();
     }
 
@@ -234,6 +272,35 @@ public:
                       getFormatiertenZeitstempel().c_str(),
                       platzName.c_str(),
                       platzId);
+
+        for (const auto& slot : sensorSlots) {
+            switch (slot.typId) {
+                case TYP_ID_SOIL_2IN1:
+                    // 2-in-1 (10 cm): Register-Offsets für Feuchte & Temperatur pro Modell fest verdrahtet
+                    Serial.printf("  -> TYP 1 (2-in-1 10cm) an Modbus %u\n", slot.modbusAddr);
+                    break;
+
+                case TYP_ID_SOIL_7IN1:
+                    // 7-in-1 (35 cm): Register-Offsets für Feuchte, Temp, EC, pH, N, P, K fest verdrahtet
+                    Serial.printf("  -> TYP 2 (7-in-1 35cm) an Modbus %u\n", slot.modbusAddr);
+                    break;
+
+                case TYP_ID_AIR:
+                    // Luft: Luftfeuchte & Lufttemperatur an slot.modbusAddr auslesen
+                    Serial.printf("  -> TYP 3 (Luft) an Modbus %u\n", slot.modbusAddr);
+                    break;
+
+                case TYP_ID_FLOW:
+                    // Durchfluss: Wert an slot.modbusAddr auslesen & an durchflussRegler übergeben
+                    Serial.printf("  -> TYP 4 (Durchfluss) an Modbus %u\n", slot.modbusAddr);
+                    break;
+
+                default:
+                    // Plan B für zukünftige neue TYP_IDs
+                    Serial.printf("  -> Unbekannte TYP_ID %u an Modbus %u\n", slot.typId, slot.modbusAddr);
+                    break;
+            }
+        }
     }
 
     void sendeSensorenDaten() { /* Logik folgt */ }
@@ -242,7 +309,6 @@ public:
 std::vector<Platz> gartenPlaetze;
 
 // --- NETZWERK FUNKTIONEN ---
-
 bool meldeNeustart() {
     Serial.println("Versuche Wiederanlauf an Backend zu melden...");
     HTTPClient http;
@@ -295,10 +361,14 @@ bool ladeKonfigurationVomServer() {
                 p.ladeAusJson(platzObj);
                 gartenPlaetze.push_back(p);
             }
-            Serial.printf("Erfolgreich %d Plätze konfiguriert!\n", gartenPlaetze.size());
+            Serial.printf("Erfolgreich %d Plaetze konfiguriert!\n", (int)gartenPlaetze.size());
             sendeConfigAck();
             erfolg = true;
+        } else {
+            Serial.printf("JSON Fehler bei Konfiguration: %s\n", error.c_str());
         }
+    } else {
+        Serial.printf("Konfiguration HTTP Fehler: %d\n", httpCode);
     }
     http.end();
     return erfolg;
@@ -344,7 +414,7 @@ void loop() {
             if (neustartGemeldet) {
                 configGeladen = ladeKonfigurationVomServer();
                 if (configGeladen) {
-                    Serial.println(">>> WECHSEL IN DEN REGULÄREN ARBEITS-LOOP SUCCESSFUL <<<");
+                    Serial.println(">>> WECHSEL IN DEN REGULAEREN ARBEITS-LOOP SUCCESSFUL <<<");
                 }
             }
         }
@@ -355,7 +425,7 @@ void loop() {
     anzahlPlaetze = gartenPlaetze.size();
     if (anzahlPlaetze == 0) return;
 
-    // Task 1: Ventile & Durchflusssteuerung (jetzt im 500ms Takt)
+    // Task 1: Ventile & Durchflusssteuerung (im 500ms Takt)
     if (currentMillis - lastVentilTime >= ventilIntervall) {
         for (int i = 0; i < anzahlPlaetze; i++) {
             gartenPlaetze[i].regleDurchfluss();
@@ -364,7 +434,7 @@ void loop() {
         lastVentilTime = currentMillis;
     }
 
-    // Task 2: Sensoren (bleibt im 2-Sekunden Takt)
+    // Task 2: Sensoren (im 2-Sekunden Takt)
     if (currentMillis - lastSensorTime >= sensorIntervall) {
         gartenPlaetze[platzIndex].leseSensoren();
         gartenPlaetze[platzIndex].sendeSensorenDaten();

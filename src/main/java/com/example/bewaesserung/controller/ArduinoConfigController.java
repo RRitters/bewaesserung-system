@@ -1,47 +1,56 @@
 package com.example.bewaesserung.controller;
 
-import com.example.bewaesserung.dto.PlatzConfigDto;
-import com.example.bewaesserung.dto.ArduinoAckDto;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/arduino")
 public class ArduinoConfigController {
 
+    public record SlotDto(int typId, int modbusAddr) {}
+
+    public record VentilDto(
+            int modbusId,
+            int laufzeitMs,
+            double sollDurchflussLpm,
+            double minDurchflussLpm
+    ) {}
+
+    public record PlatzConfigResponse(
+            long platzId,
+            String platzName,
+            VentilDto ventil,
+            List<SlotDto> slots
+    ) {}
+
     @GetMapping("/configure")
-    public ResponseEntity<List<PlatzConfigDto>> getConfiguration() {
-        List<PlatzConfigDto> configList = new ArrayList<>();
+    public ResponseEntity<List<PlatzConfigResponse>> getConfiguration() {
+        List<PlatzConfigResponse> configList = new ArrayList<>();
 
-        // Konfiguration für Platz 12 (Aus deiner DB)
-        PlatzConfigDto platz12 = new PlatzConfigDto();
-        platz12.setPlatzId(12L);
-        platz12.setPlatzName("Durian_Platz_12");
-        // Sensoren: Durchfluss(3) + Boden 10cm(10,11,12) + Boden 35cm(20,21,22)
-        platz12.setSensorModbusIds(Arrays.asList(3, 10, 11, 12, 20, 21, 22));
-        // Ventil: Kugelhahn über Relais
-        platz12.setVentilModbusId(4);
-        platz12.setVentilLaufzeitMs(10000);
-        platz12.setSollPosition(0);
-        configList.add(platz12);
+        // Beispiel für Platz 12: Sensoren (1..19) + Ventil (>= 20)
+        List<SlotDto> slotsPlatz12 = List.of(
+                new SlotDto(1, 1), // TYP_ID 1: 2-in-1 (10 cm) an Modbus 1
+                new SlotDto(2, 2), // TYP_ID 2: 7-in-1 (35 cm) an Modbus 2
+                new SlotDto(3, 3), // TYP_ID 3: Luft an Modbus 3
+                new SlotDto(4, 4)  // TYP_ID 4: Durchfluss an Modbus 4
+        );
+        VentilDto ventilPlatz12 = new VentilDto(20, 10000, 0.0, 6.0);
+        configList.add(new PlatzConfigResponse(12L, "Durian_Platz_12", ventilPlatz12, slotsPlatz12));
 
-        // Konfiguration für Platz 13 (Aus deiner DB)
-        PlatzConfigDto platz13 = new PlatzConfigDto();
-        platz13.setPlatzId(13L);
-        platz13.setPlatzName("Durian_Platz_13");
-        platz13.setSensorModbusIds(Arrays.asList(3, 10, 11, 12, 20, 21, 22));
-        platz13.setVentilModbusId(4);
-        platz13.setVentilLaufzeitMs(10000);
-        platz13.setSollPosition(0);
-        configList.add(platz13);
+        // Beispiel für Platz 13
+        List<SlotDto> slotsPlatz13 = List.of(
+                new SlotDto(1, 1),
+                new SlotDto(2, 2),
+                new SlotDto(3, 3),
+                new SlotDto(4, 4)
+        );
+        VentilDto ventilPlatz13 = new VentilDto(20, 10000, 0.0, 6.0);
+        configList.add(new PlatzConfigResponse(13L, "Durian_Platz_13", ventilPlatz13, slotsPlatz13));
 
         return ResponseEntity.ok(configList);
     }
