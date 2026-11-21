@@ -37,9 +37,11 @@ public class MesswertController {
     @GetMapping("/generate")
     public Messwert generateDummyMeasurement() {
         Messwert m = new Messwert();
-        m.setPlatzId(1L); // Platz-ID statt Sensor-ID
-        m.setBodenFeuchte(42.5); // Bodenfeuchte statt setWert
-        m.setBodenTemperatur(25.0);
+        m.setPlatzId(21L); // Echte Platz-ID aus PLATZ
+        m.setFeuchte10cm(42.5);
+        m.setTemp10cm(25.0);
+        m.setFeuchte35cm(47.5);
+        m.setTemp35cm(24.0);
         m.setLuftTemperatur(23.5);
         m.setLuftFeuchte(60.0);
         m.setDurchfluss(0.0);

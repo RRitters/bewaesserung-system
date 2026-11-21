@@ -25,12 +25,19 @@ public class Messwert {
     @Column(name = "LUFTFEUCHTE")
     private Double luftFeuchte;
 
-    // Bodendaten
-    @Column(name = "BODENTEMPERATUR")
-    private Double bodenTemperatur;
+    // Bodendaten 10 cm (2-in-1 Sensor, TYP 1)
+    @Column(name = "TEMP_10CM")
+    private Double temp10cm;
 
-    @Column(name = "BODENFEUCHTE")
-    private Double bodenFeuchte;
+    @Column(name = "FEUCHTE_10CM")
+    private Double feuchte10cm;
+
+    // Bodendaten 35 cm (7-in-1 Sensor, TYP 2)
+    @Column(name = "FEUCHTE_35CM")
+    private Double feuchte35cm;
+
+    @Column(name = "TEMP_35CM")
+    private Double temp35cm;
 
     @Column(name = "EC_WERT")
     private Double ecWert;
@@ -66,11 +73,17 @@ public class Messwert {
     public Double getLuftFeuchte() { return luftFeuchte; }
     public void setLuftFeuchte(Double luftFeuchte) { this.luftFeuchte = luftFeuchte; }
 
-    public Double getBodenTemperatur() { return bodenTemperatur; }
-    public void setBodenTemperatur(Double bodenTemperatur) { this.bodenTemperatur = bodenTemperatur; }
+    public Double getTemp10cm() { return temp10cm; }
+    public void setTemp10cm(Double temp10cm) { this.temp10cm = temp10cm; }
 
-    public Double getBodenFeuchte() { return bodenFeuchte; }
-    public void setBodenFeuchte(Double bodenFeuchte) { this.bodenFeuchte = bodenFeuchte; }
+    public Double getFeuchte10cm() { return feuchte10cm; }
+    public void setFeuchte10cm(Double feuchte10cm) { this.feuchte10cm = feuchte10cm; }
+
+    public Double getFeuchte35cm() { return feuchte35cm; }
+    public void setFeuchte35cm(Double feuchte35cm) { this.feuchte35cm = feuchte35cm; }
+
+    public Double getTemp35cm() { return temp35cm; }
+    public void setTemp35cm(Double temp35cm) { this.temp35cm = temp35cm; }
 
     public Double getEcWert() { return ecWert; }
     public void setEcWert(Double ecWert) { this.ecWert = ecWert; }

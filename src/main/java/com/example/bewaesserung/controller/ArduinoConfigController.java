@@ -32,25 +32,25 @@ public class ArduinoConfigController {
     public ResponseEntity<List<PlatzConfigResponse>> getConfiguration() {
         List<PlatzConfigResponse> configList = new ArrayList<>();
 
-        // Beispiel für Platz 12: Sensoren (1..19) + Ventil (>= 20)
-        List<SlotDto> slotsPlatz12 = List.of(
+        // Platz 21: Reihe 1 - Platz 1 (existiert in Oracle PLATZ)
+        List<SlotDto> slotsPlatz21 = List.of(
                 new SlotDto(1, 1), // TYP_ID 1: 2-in-1 (10 cm) an Modbus 1
                 new SlotDto(2, 2), // TYP_ID 2: 7-in-1 (35 cm) an Modbus 2
                 new SlotDto(3, 3), // TYP_ID 3: Luft an Modbus 3
                 new SlotDto(4, 4)  // TYP_ID 4: Durchfluss an Modbus 4
         );
-        VentilDto ventilPlatz12 = new VentilDto(20, 10000, 0.0, 6.0);
-        configList.add(new PlatzConfigResponse(12L, "Durian_Platz_12", ventilPlatz12, slotsPlatz12));
+        VentilDto ventilPlatz21 = new VentilDto(20, 10000, 0.0, 6.0);
+        configList.add(new PlatzConfigResponse(21L, "Reihe 1 - Platz 1", ventilPlatz21, slotsPlatz21));
 
-        // Beispiel für Platz 13
-        List<SlotDto> slotsPlatz13 = List.of(
+        // Platz 22: Reihe 1 - Platz 2 (existiert in Oracle PLATZ)
+        List<SlotDto> slotsPlatz22 = List.of(
                 new SlotDto(1, 1),
                 new SlotDto(2, 2),
                 new SlotDto(3, 3),
                 new SlotDto(4, 4)
         );
-        VentilDto ventilPlatz13 = new VentilDto(20, 10000, 0.0, 6.0);
-        configList.add(new PlatzConfigResponse(13L, "Durian_Platz_13", ventilPlatz13, slotsPlatz13));
+        VentilDto ventilPlatz22 = new VentilDto(21, 10000, 0.0, 6.0);
+        configList.add(new PlatzConfigResponse(22L, "Reihe 1 - Platz 2", ventilPlatz22, slotsPlatz22));
 
         return ResponseEntity.ok(configList);
     }
