@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Platz-Einmessung (Mobil)</title>
+    <style>
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+        body { margin: 0; padding: 16px; background: #f2f4f7; color: #1d2939; }
+        h1 { font-size: 20px; margin: 0 0 12px 0; text-align: center; }
+        .card {
+            background: #ffffff;
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            max-width: 480px;
+            margin: 0 auto;
+        }
+        label { font-size: 13px; color: #667085; font-weight: 600; display: block; margin-bottom: 6px; }
+        select {
+            width: 100%;
+            padding: 14px;
+            font-size: 17px;
+            font-weight: 600;
+            border-radius: 10px;
+            border: 1px solid #d0d5dd;
+            background: #fff;
+            margin-bottom: 18px;
+        }
+        .werte-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        .wert-box {
+            background: #f8fafc;
+            border: 1px solid #e4e7ec;
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+        }
+        .wert-box .titel { font-size: 12px; color: #667085; }
+        .wert-box .zahl { font-size: 26px; font-weight: 700; margin-top: 4px; }
+        .soll-farbe { color: #026aa2; }
+        .ist-farbe { color: #039855; }
+        .btn-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        button {
+            border: none;
+            border-radius: 10px;
+            padding: 16px 8px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        .btn-step { background: #e0f2fe; color: #026aa2; }
+        .btn-step:active { background: #bae6fd; }
+        .btn-preset {
+            width: 100%;
+            background: #f2f4f7;
+            color: #344054;
+            font-size: 15px;
+            padding: 12px;
+            margin-bottom: 14px;
+        }
+        .btn-save {
+            width: 100%;
+            background: #12b76a;
+            color: #ffffff;
+            font-size: 18px;
+            padding: 18px;
+        }
+        .btn-save:active { background: #039855; }
+        .status {
+            margin-top: 14px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            min-height: 22px;
+            color: #039855;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>Ventil-Einmessung vor Ort</h1>
+
+    <label for="platzSelect">Aktiver Platz</label>
+    <select id="platzSelect"></select>
+
+    <div class="werte-row">
+        <div class="wert-box">
+            <div class="titel">SOLL-Vorgabe</div>
+            <div class="zahl soll-farbe"><span id="sollAnzeige">24.0</span> <small style="font-size:14px;">l/m</small></div>
+        </div>
+        <div class="wert-box">
+            <div class="titel">IST-Durchfluss (ESP32)</div>
+            <div class="zahl ist-farbe"><span id="istAnzeige">0.0</span> <small style="font-size:14px;">l/m</small></div>
+        </div>
+    </div>
+
+    <label>Durchfluss abregeln / anpassen</label>
+    <div class="btn-grid">
+        <button class="btn-step" onclick="aendereSoll(-2.0)">-2.0</button>
+        <button class="btn-step" onclick="aendereSoll(-0.5)">-0.5</button>
+        <button class="btn-step" onclick="aendereSoll(+0.5)">+0.5</button>
+        <button class="btn-step" onclick="aendereSoll(+2.0)">+2.0</button>
+    </div>
+
+    <button class="btn-preset" onclick="setzeSoll(24.0)">Auf MAX zurücksetzen (24.0 l/min)</button>
+    <button class="btn-save" onclick="speichereSoll()">Vorgabe dauerhaft speichern</button>
+
+    <div class="status" id="statusText"></div>
+</div>
+
+<script>
+    let platzConfigs = [];
+    let aktuellerSoll = 24.0;
+
+    async function ladePlaetze() {
+        const res = await fetch('/api/arduino/configure');
+        platzConfigs = await res.json();
+
+        const select = document.getElementById('platzSelect');
+        select.innerHTML = platzConfigs.map(p =>
+            `<option value="${p.platzId}">Platz ${p.platzId} – ${p.platzName}</option>`
+        ).join('');
+
+        select.addEventListener('change', waehlePlatzAus);
+        if (platzConfigs.length > 0) {
+            waehlePlatzAus();
+        }
+    }
+
+    function waehlePlatzAus() {
+        const id = Number(document.getElementById('platzSelect').value);
+        const cfg = platzConfigs.find(p => p.platzId === id);
+        if (cfg && cfg.ventil) {
+            aktuellerSoll = cfg.ventil.sollDurchflussLpm;
+            document.getElementById('sollAnzeige').textContent = aktuellerSoll.toFixed(1);
+        }
+        document.getElementById('statusText').textContent = '';
+        ladeIstDurchfluss();
+    }
+
+    function aendereSoll(delta) {
+        setzeSoll(aktuellerSoll + delta);
+    }
+
+    function setzeSoll(wert) {
+        aktuellerSoll = Math.max(0.0, Math.min(24.0, Math.round(wert * 10) / 10));
+        document.getElementById('sollAnzeige').textContent = aktuellerSoll.toFixed(1);
+        document.getElementById('statusText').textContent = 'Noch nicht gespeichert...';
+        document.getElementById('statusText').style.color = '#d97706';
+    }
+
+    async function speichereSoll() {
+        const id = Number(document.getElementById('platzSelect').value);
+        const statusEl = document.getElementById('statusText');
+        try {
+            const res = await fetch(`/api/arduino/platz/${id}/durchfluss`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sollDurchflussLpm: aktuellerSoll })
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+
+            const cfg = platzConfigs.find(p => p.platzId === id);
+            if (cfg && cfg.ventil) cfg.ventil.sollDurchflussLpm = aktuellerSoll;
+
+            statusEl.style.color = '#039855';
+            statusEl.textContent = `Gespeichert! Vorgabe für Platz ${id}: ${aktuellerSoll.toFixed(1)} l/min`;
+        } catch (e) {
+            statusEl.style.color = '#d92d20';
+            statusEl.textContent = 'Fehler beim Speichern: ' + e.message;
+        }
+    }
+
+    async function ladeIstDurchfluss() {
+        const id = Number(document.getElementById('platzSelect').value);
+        if (!id) return;
+        try {
+            const res = await fetch(`/api/measurements/sensor/${id}`);
+            const daten = await res.json();
+            if (Array.isArray(daten) && daten.length > 0 && daten[0].durchfluss !== null) {
+                document.getElementById('istAnzeige').textContent = Number(daten[0].durchfluss).toFixed(1);
+            }
+        } catch (e) {
+            // ignoriere kurzzeitige Netzwerkfehler
+        }
+    }
+
+    ladePlaetze();
+    setInterval(ladeIstDurchfluss, 2000);
+</script>
+
+</body>
+</html>

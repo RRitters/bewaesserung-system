@@ -69,6 +69,27 @@ public class Platz {
     @Column(name = "FEUCHTE_35CM")
     private Double feuchte35Cm;
 
+    public static final double SOLL_DURCHFLUSS_MAX = 24.0;
+
+    // Eingemessener Soll-Durchfluss in l/min (Startwert MAX = 24.0, wird vor Ort per Handy eingemessen)
+    @Column(name = "SOLL_DURCHFLUSS")
+    private Double sollDurchfluss = SOLL_DURCHFLUSS_MAX;
+
+    public Double getSollDurchfluss() {
+        return sollDurchfluss != null ? sollDurchfluss : SOLL_DURCHFLUSS_MAX;
+    }
+
+    public void setSollDurchfluss(Double sollDurchflussIn) {
+        if (sollDurchflussIn == null || sollDurchflussIn > SOLL_DURCHFLUSS_MAX) {
+            this.sollDurchfluss = SOLL_DURCHFLUSS_MAX;
+        } else if (sollDurchflussIn < 0.0) {
+            this.sollDurchfluss = 0.0;
+        } else {
+            this.sollDurchfluss = sollDurchflussIn;
+        }
+    }
+
+
     // Getter & Setter dazu generieren (Alt + Einfg in IntelliJ)    // Der Platz kennt alle seine Sensoren (Unidirektional über JoinColumn)
     @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @JoinColumn(name = "platz_id")
