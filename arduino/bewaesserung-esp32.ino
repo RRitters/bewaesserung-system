@@ -4,6 +4,12 @@
 #include <ArduinoJson.h>
 #include <time.h>
 #include <vector>
+#include <math.h>
+
+// --- SIMULATIONS-SCHALTER ---
+// Solange kein RS485/Modbus und keine Fühler angeschlossen sind, erzeugt der ESP32 plausible Messwerte.
+// Sobald echte Hardware angeschlossen ist, auf false setzen und Modbus-Auslesung aktivieren.
+#define SIMULATION_MODUS true
 
 // --- WLAN DATEN ---
 const char* WIFI_SSID = "Nathamon2508";
@@ -50,6 +56,19 @@ struct SensorSlot {
     uint8_t  modbusAddr;
 };
 
+struct MesswertDatensatz {
+    uint16_t typId;
+    uint8_t  modbusAddr;
+    float    feuchte;
+    float    temperatur;
+    float    ec;
+    float    ph;
+    float    n;
+    float    p;
+    float    k;
+    float    durchflussLpm;
+};
+
 // --- ZEIT & NTP VARIABLEN ---
 const long  gmtOffset_sec = 25200;      // UTC +7 für Thailand (7 * 3600)
 const int   daylightOffset_sec = 0;
@@ -84,8 +103,7 @@ String getFormatiertenZeitstempel() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
 
-    // Wir addieren hier starr 7 Stunden (25200 Sekunden) für Thailand (ICT / UTC+7) drauf,
-    // damit der ESP32 unabhängig von der UTC-Systemzeit die echte Ortszeit anzeigt.
+    // Starr 7 Stunden (25200 Sekunden) für Thailand (ICT / UTC+7) addieren
     time_t nowSecs = tv.tv_sec + (7 * 3600);
 
     struct tm timeinfo;
@@ -164,12 +182,16 @@ public:
         istDurchflussLpm = ist;
     }
 
+    int getAktuelleStufe() const {
+        return aktuelleStufe;
+    }
+
     // Wird alle 500ms aufgerufen (entspricht einem von 20 Schritten für die 10s Laufzeit)
     void updateRegelung() {
         if (ventilModbusId <= 0) return;
 
         if (istDurchflussLpm > MAX_DURCHFLUSS) {
-            Serial.printf("[ALARM] Ventil Modbus %d: Durchfluss mit %.1f l/min ueber Max-Grenze (30 l/min)!\n",
+            Serial.printf("[ALARM] Ventil Modbus %d: Durchfluss %.1f l/min ueber Max-Grenze (30 l/min)!\n",
                           ventilModbusId, istDurchflussLpm);
             schliesseNotfall();
             return;
@@ -183,11 +205,12 @@ public:
             return;
         }
 
-        if (istDurchflussLpm < sollDurchflussLpm && aktuelleStufe < 20) {
+        // Totband +-0.3 l/min gegen ständiges Nachregeln
+        if (istDurchflussLpm < (sollDurchflussLpm - 0.3f) && aktuelleStufe < 20) {
             aktuelleStufe++;
             Serial.printf("Ventil %d oeffnet einen Schritt (Stufe %d/20) | Ist: %.1f / Soll: %.1f l/min\n",
                           ventilModbusId, aktuelleStufe, istDurchflussLpm, sollDurchflussLpm);
-        } else if (istDurchflussLpm > sollDurchflussLpm && aktuelleStufe > 0) {
+        } else if (istDurchflussLpm > (sollDurchflussLpm + 0.3f) && aktuelleStufe > 0) {
             aktuelleStufe--;
             Serial.printf("Ventil %d drosselt einen Schritt (Stufe %d/20) | Ist: %.1f / Soll: %.1f l/min\n",
                           ventilModbusId, aktuelleStufe, istDurchflussLpm, sollDurchflussLpm);
@@ -201,12 +224,13 @@ private:
     }
 };
 
-// --- KLASSEN DEFINITIONEN ---
+// --- PLATZ KLASSE ---
 class Platz {
 public:
     int platzId = 0;
     String platzName;
     std::vector<SensorSlot> sensorSlots;
+    std::vector<MesswertDatensatz> aktuelleMesswerte;
     int ventilModbusId = 0;
     int ventilLaufzeitMs = 0;
     float sollDurchflussLpm = 0.0f;
@@ -268,42 +292,118 @@ public:
     }
 
     void leseSensoren() {
-        Serial.printf("[%s] Lese Sensoren fuer Platz %s (ID: %d)\n",
-                      getFormatiertenZeitstempel().c_str(),
+        aktuelleMesswerte.clear();
+        String ts = getFormatiertenZeitstempel();
+        Serial.printf("[%s] Lese Sensoren fuer Platz %s (ID: %d)%s\n",
+                      ts.c_str(),
                       platzName.c_str(),
-                      platzId);
+                      platzId,
+                      SIMULATION_MODUS ? " [SIMULATION]" : "");
+
+        // Sanfte Zeit-Welle für realistische, platzspezifische Messwerte
+        float phase = (millis() / 10000.0f) + (platzId * 0.7f);
 
         for (const auto& slot : sensorSlots) {
-            switch (slot.typId) {
-                case TYP_ID_SOIL_2IN1:
-                    // 2-in-1 (10 cm): Register-Offsets für Feuchte & Temperatur pro Modell fest verdrahtet
-                    Serial.printf("  -> TYP 1 (2-in-1 10cm) an Modbus %u\n", slot.modbusAddr);
-                    break;
+            MesswertDatensatz m = {};
+            m.typId = slot.typId;
+            m.modbusAddr = slot.modbusAddr;
 
-                case TYP_ID_SOIL_7IN1:
-                    // 7-in-1 (35 cm): Register-Offsets für Feuchte, Temp, EC, pH, N, P, K fest verdrahtet
-                    Serial.printf("  -> TYP 2 (7-in-1 35cm) an Modbus %u\n", slot.modbusAddr);
-                    break;
+            if (SIMULATION_MODUS) {
+                switch (slot.typId) {
+                    case TYP_ID_SOIL_2IN1: // 10 cm Boden (ComWinTop TH-S)
+                        m.feuchte    = 38.0f + sin(phase) * 4.5f + (random(-20, 21) / 100.0f);
+                        m.temperatur = 26.5f + cos(phase) * 1.2f;
+                        Serial.printf("  -> TYP 1 (10cm, MB %u): Feuchte=%.1f%%, Temp=%.1fC\n",
+                                      slot.modbusAddr, m.feuchte, m.temperatur);
+                        break;
 
-                case TYP_ID_AIR:
-                    // Luft: Luftfeuchte & Lufttemperatur an slot.modbusAddr auslesen
-                    Serial.printf("  -> TYP 3 (Luft) an Modbus %u\n", slot.modbusAddr);
-                    break;
+                    case TYP_ID_SOIL_7IN1: // 35 cm Boden (ComWinTop NPKPHCTH-S)
+                        m.feuchte    = 46.0f + sin(phase * 0.6f) * 3.0f;
+                        m.temperatur = 25.0f + cos(phase * 0.6f) * 0.8f;
+                        m.ec         = 1.25f + sin(phase) * 0.15f;
+                        m.ph         = 6.4f + cos(phase) * 0.2f;
+                        m.n          = 42.0f + sin(phase) * 3.0f;
+                        m.p          = 18.0f + cos(phase) * 2.0f;
+                        m.k          = 55.0f + sin(phase) * 4.0f;
+                        Serial.printf("  -> TYP 2 (35cm, MB %u): Feuchte=%.1f%%, Temp=%.1fC, pH=%.1f, EC=%.2f\n",
+                                      slot.modbusAddr, m.feuchte, m.temperatur, m.ph, m.ec);
+                        break;
 
-                case TYP_ID_FLOW:
-                    // Durchfluss: Wert an slot.modbusAddr auslesen & an durchflussRegler übergeben
-                    Serial.printf("  -> TYP 4 (Durchfluss) an Modbus %u\n", slot.modbusAddr);
-                    break;
+                    case TYP_ID_AIR: // Luftfeuchte & Lufttemperatur
+                        m.temperatur = 30.2f + sin(phase * 0.5f) * 2.5f;
+                        m.feuchte    = 68.0f - sin(phase * 0.5f) * 6.0f;
+                        Serial.printf("  -> TYP 3 (Luft, MB %u): Temp=%.1fC, Feuchte=%.1f%%\n",
+                                      slot.modbusAddr, m.temperatur, m.feuchte);
+                        break;
 
-                default:
-                    // Plan B für zukünftige neue TYP_IDs
-                    Serial.printf("  -> Unbekannte TYP_ID %u an Modbus %u\n", slot.typId, slot.modbusAddr);
-                    break;
+                    case TYP_ID_FLOW: { // Durchfluss gekoppelt an Ventilstellung (0..20 -> 0..24 l/min)
+                        float ventilAnteil = durchflussRegler.getAktuelleStufe() / 20.0f;
+                        float rauschen = (ventilAnteil > 0.0f) ? (random(-15, 16) / 100.0f) : 0.0f;
+                        m.durchflussLpm = max(0.0f, ventilAnteil * 24.0f + rauschen);
+                        durchflussRegler.setIstDurchfluss(m.durchflussLpm);
+                        Serial.printf("  -> TYP 4 (Flow, MB %u): %.2f l/min (Ventil Stufe %d/20)\n",
+                                      slot.modbusAddr, m.durchflussLpm, durchflussRegler.getAktuelleStufe());
+                        break;
+                    }
+
+                    default:
+                        Serial.printf("  -> Unbekannte TYP_ID %u an Modbus %u\n",
+                                      slot.typId, slot.modbusAddr);
+                        break;
+                }
+            } else {
+                // Hier folgt später der echte Modbus-RTU-Code (wenn SIMULATION_MODUS == false)
             }
+
+            aktuelleMesswerte.push_back(m);
         }
     }
 
-    void sendeSensorenDaten() { /* Logik folgt */ }
+    void sendeSensorenDaten() {
+        if (aktuelleMesswerte.empty() || WiFi.status() != WL_CONNECTED) return;
+
+        JsonDocument doc;
+        doc["platzId"] = platzId;
+        doc["zeitstempel"] = getFormatiertenZeitstempel();
+        doc["simulation"] = SIMULATION_MODUS;
+
+        JsonArray werteArray = doc["werte"].to<JsonArray>();
+        for (const auto& m : aktuelleMesswerte) {
+            JsonObject obj = werteArray.add<JsonObject>();
+            obj["typId"] = m.typId;
+            obj["modbusAddr"] = m.modbusAddr;
+
+            if (m.typId == TYP_ID_SOIL_2IN1 || m.typId == TYP_ID_AIR) {
+                obj["feuchte"] = round(m.feuchte * 10.0f) / 10.0f;
+                obj["temperatur"] = round(m.temperatur * 10.0f) / 10.0f;
+            } else if (m.typId == TYP_ID_SOIL_7IN1) {
+                obj["feuchte"] = round(m.feuchte * 10.0f) / 10.0f;
+                obj["temperatur"] = round(m.temperatur * 10.0f) / 10.0f;
+                obj["ec"] = round(m.ec * 100.0f) / 100.0f;
+                obj["ph"] = round(m.ph * 10.0f) / 10.0f;
+                obj["n"] = round(m.n);
+                obj["p"] = round(m.p);
+                obj["k"] = round(m.k);
+            } else if (m.typId == TYP_ID_FLOW) {
+                obj["durchflussLpm"] = round(m.durchflussLpm * 100.0f) / 100.0f;
+            }
+        }
+
+        String jsonPayload;
+        serializeJson(doc, jsonPayload);
+
+        HTTPClient http;
+        if (http.begin(serverUrl[DATA])) {
+            http.addHeader("Content-Type", "application/json");
+            int httpCode = http.POST(jsonPayload);
+            if (httpCode > 0) {
+                Serial.printf("  [POST /data] Platz %d -> HTTP %d\n", platzId, httpCode);
+            } else {
+                Serial.printf("  [POST /data] Fehler: %s\n", http.errorToString(httpCode).c_str());
+            }
+            http.end();
+        }
+    }
 };
 
 std::vector<Platz> gartenPlaetze;
@@ -378,6 +478,7 @@ bool ladeKonfigurationVomServer() {
 void setup() {
     Serial.begin(115200);
     delay(1000);
+    randomSeed(esp_random());
 
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
