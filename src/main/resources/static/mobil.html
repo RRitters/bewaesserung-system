@@ -69,6 +69,25 @@
             padding: 12px;
             margin-bottom: 14px;
         }
+        .scope-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .btn-scope {
+            background: #f8fafc;
+            color: #344054;
+            border: 1.5px solid #d0d5dd;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 12px 6px;
+        }
+        .btn-scope.active {
+            background: #1d2939;
+            color: #ffffff;
+            border-color: #1d2939;
+        }
         .btn-save {
             width: 100%;
             background: #12b76a;
@@ -115,6 +134,14 @@
     </div>
 
     <button class="btn-preset" onclick="setzeSoll(24.0)">Auf MAX zurücksetzen (24.0 l/min)</button>
+
+    <label>Vorgabe anwenden auf</label>
+    <div class="scope-grid">
+        <button type="button" class="btn-scope active" data-scope="PLATZ" onclick="setzeScope('PLATZ')">Dieser Platz</button>
+        <button type="button" class="btn-scope" data-scope="REIHE" onclick="setzeScope('REIHE')">Ganze Reihe</button>
+        <button type="button" class="btn-scope" data-scope="ALLE" onclick="setzeScope('ALLE')">Alle Plätze</button>
+    </div>
+
     <button class="btn-save" onclick="speichereSoll()">Vorgabe dauerhaft speichern</button>
 
     <div class="status" id="statusText"></div>
@@ -123,6 +150,20 @@
 <script>
     let platzConfigs = [];
     let aktuellerSoll = 24.0;
+    let ausgewaehlterScope = 'PLATZ';
+
+    function extrahiereReihe(platzName) {
+        if (!platzName) return '';
+        const idx = platzName.indexOf(' - ');
+        return (idx > 0) ? platzName.substring(0, idx).trim() : platzName.trim();
+    }
+
+    function setzeScope(scope) {
+        ausgewaehlterScope = scope;
+        document.querySelectorAll('.btn-scope').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.scope === scope);
+        });
+    }
 
     async function ladePlaetze() {
         const res = await fetch('/api/arduino/configure');
@@ -164,19 +205,46 @@
     async function speichereSoll() {
         const id = Number(document.getElementById('platzSelect').value);
         const statusEl = document.getElementById('statusText');
+
+        if (ausgewaehlterScope === 'ALLE') {
+            const ok = confirm(`Wirklich ${aktuellerSoll.toFixed(1)} l/min für ALLE Plätze speichern?`);
+            if (!ok) return;
+        }
+
         try {
-            const res = await fetch(`/api/arduino/platz/${id}/durchfluss`, {
+            const res = await fetch('/api/plaetze/soll-durchfluss/batch', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sollDurchflussLpm: aktuellerSoll })
+                body: JSON.stringify({
+                    platzId: id,
+                    scope: ausgewaehlterScope,
+                    sollDurchflussLpm: aktuellerSoll
+                })
             });
             if (!res.ok) throw new Error('HTTP ' + res.status);
 
-            const cfg = platzConfigs.find(p => p.platzId === id);
-            if (cfg && cfg.ventil) cfg.ventil.sollDurchflussLpm = aktuellerSoll;
+            const data = await res.json();
+            const aktiveCfg = platzConfigs.find(p => p.platzId === id);
+            const aktiveReihe = aktiveCfg ? extrahiereReihe(aktiveCfg.platzName) : '';
+
+            // Lokalen Cache für die betroffenen Plätze sofort aktualisieren
+            platzConfigs.forEach(p => {
+                if (!p.ventil) return;
+                if (ausgewaehlterScope === 'ALLE' ||
+                    (ausgewaehlterScope === 'REIHE' && extrahiereReihe(p.platzName).toLowerCase() === aktiveReihe.toLowerCase()) ||
+                    (ausgewaehlterScope === 'PLATZ' && p.platzId === id)) {
+                    p.ventil.sollDurchflussLpm = aktuellerSoll;
+                }
+            });
+
+            const zielText = data.scope === 'ALLE'
+                ? `alle ${data.aktualisiertePlaetze} Plätze`
+                : data.scope === 'REIHE'
+                    ? `${aktiveReihe} (${data.aktualisiertePlaetze} Plätze)`
+                    : `Platz ${id}`;
 
             statusEl.style.color = '#039855';
-            statusEl.textContent = `Gespeichert! Vorgabe für Platz ${id}: ${aktuellerSoll.toFixed(1)} l/min`;
+            statusEl.textContent = `Gespeichert! Vorgabe für ${zielText}: ${aktuellerSoll.toFixed(1)} l/min`;
         } catch (e) {
             statusEl.style.color = '#d92d20';
             statusEl.textContent = 'Fehler beim Speichern: ' + e.message;
