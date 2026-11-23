@@ -208,10 +208,16 @@ public:
         // Totband +-0.3 l/min gegen ständiges Nachregeln
         if (istDurchflussLpm < (sollDurchflussLpm - 0.3f) && aktuelleStufe < 20) {
             aktuelleStufe++;
+            if (SIMULATION_MODUS) {
+                istDurchflussLpm = (aktuelleStufe / 20.0f) * 24.0f;
+            }
             Serial.printf("Ventil %d oeffnet einen Schritt (Stufe %d/20) | Ist: %.1f / Soll: %.1f l/min\n",
                           ventilModbusId, aktuelleStufe, istDurchflussLpm, sollDurchflussLpm);
         } else if (istDurchflussLpm > (sollDurchflussLpm + 0.3f) && aktuelleStufe > 0) {
             aktuelleStufe--;
+            if (SIMULATION_MODUS) {
+                istDurchflussLpm = (aktuelleStufe / 20.0f) * 24.0f;
+            }
             Serial.printf("Ventil %d drosselt einen Schritt (Stufe %d/20) | Ist: %.1f / Soll: %.1f l/min\n",
                           ventilModbusId, aktuelleStufe, istDurchflussLpm, sollDurchflussLpm);
         }
@@ -359,8 +365,11 @@ public:
         }
     }
 
-    void sendeSensorenDaten() {
+void sendeSensorenDaten() {
         if (aktuelleMesswerte.empty() || WiFi.status() != WL_CONNECTED) return;
+
+        float letzterDurchflussLpm = 0.0f;
+        bool hatDurchflussWert = false;
 
         JsonDocument doc;
         doc["platzId"] = platzId;
@@ -386,6 +395,8 @@ public:
                 obj["k"] = round(m.k);
             } else if (m.typId == TYP_ID_FLOW) {
                 obj["durchflussLpm"] = round(m.durchflussLpm * 100.0f) / 100.0f;
+                letzterDurchflussLpm = m.durchflussLpm;
+                hatDurchflussWert = true;
             }
         }
 
@@ -396,10 +407,34 @@ public:
         if (http.begin(serverUrl[DATA])) {
             http.addHeader("Content-Type", "application/json");
             int httpCode = http.POST(jsonPayload);
+
             if (httpCode > 0) {
-                Serial.printf("  [POST /data] Platz %d -> HTTP %d\n", platzId, httpCode);
+                String responseBody = http.getString();
+
+                if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_CREATED) {
+                    JsonDocument respDoc;
+                    DeserializationError err = deserializeJson(respDoc, responseBody);
+
+                    if (!err && !respDoc["sollDurchflussLpm"].isNull()) {
+                        float neuerSollLpm = respDoc["sollDurchflussLpm"].as<float>();
+
+                        // Falls die Platz-Klasse ein Feld sollDurchflussLpm hat, hier übernehmen:
+                        sollDurchflussLpm = neuerSollLpm;
+
+                        if (hatDurchflussWert) {
+                            durchflussRegler.setIstDurchfluss(letzterDurchflussLpm);
+                        }
+
+                        // Hier deine echte Sollwert-/Regler-Methode von durchflussRegler eintragen, z. B.:
+                        durchflussRegler.setSollDurchfluss(neuerSollLpm);
+
+                        Serial.printf("[LIVE-SOLL] Platz %d -> empfangener Soll-Durchfluss: %.1f l/min (Stufe %d)\n",
+                                      platzId, neuerSollLpm, durchflussRegler.getAktuelleStufe());
+                    }
+                }
             } else {
-                Serial.printf("  [POST /data] Fehler: %s\n", http.errorToString(httpCode).c_str());
+                Serial.printf("[HTTP-POST] Fehler auf Platz %d: %s\n",
+                              platzId, http.errorToString(httpCode).c_str());
             }
             http.end();
         }
@@ -407,7 +442,6 @@ public:
 };
 
 std::vector<Platz> gartenPlaetze;
-
 // --- NETZWERK FUNKTIONEN ---
 bool meldeNeustart() {
     Serial.println("Versuche Wiederanlauf an Backend zu melden...");

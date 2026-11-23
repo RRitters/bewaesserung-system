@@ -1,31 +1,29 @@
 package com.example.bewaesserung.controller;
 
 import com.example.bewaesserung.model.Messwert;
-import com.example.bewaesserung.model.SystemEventLog;
+import com.example.bewaesserung.model.Platz;
 import com.example.bewaesserung.repository.MesswertRepository;
 import com.example.bewaesserung.repository.PlatzRepository;
-import com.example.bewaesserung.repository.SystemEventLogRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/arduino")
 public class ArduinoController {
 
     @Autowired
-    private MesswertRepository messwertRepository;
-
-    @Autowired
-    private SystemEventLogRepository eventLogRepository;
-
-    @Autowired
     private PlatzRepository platzRepository;
 
-    public record SensorWertDto(
+    // TODO: Dein bestehendes Repository/Service zum Speichern in MESSWERTE einfügen, z. B.:
+    @Autowired
+    private MesswertRepository messwertRepository;
+
+    public record SensorWertItem(
             Integer typId,
             Integer modbusAddr,
             Double feuchte,
@@ -38,24 +36,35 @@ public class ArduinoController {
             Double durchflussLpm
     ) {}
 
-    public record ArduinoBatchDataDto(
+    public record ArduinoMessdatenRequest(
             Long platzId,
             String zeitstempel,
             Boolean simulation,
-            List<SensorWertDto> werte
+            List<SensorWertItem> werte
     ) {}
 
+    public record ArduinoDataResponse(
+            String status,
+            Long platzId,
+            double sollDurchflussLpm
+    ) {}
+
+    @PostMapping("/reboot")
+    public ResponseEntity receiveReboot(@RequestBody(required = false) Map<String, Object> payload) {
+        return ResponseEntity.ok(Map.of("status", "OK"));
+    }
+
     @PostMapping("/data")
-    public ResponseEntity<String> receiveSensorData(@RequestBody ArduinoBatchDataDto data) {
-        if (data == null || data.platzId() == null || data.werte() == null || data.werte().isEmpty()) {
-            return ResponseEntity.badRequest().body("Ungueltige oder leere Sensordaten");
+    public ResponseEntity<ArduinoDataResponse> receiveData(@RequestBody ArduinoMessdatenRequest req) {
+        if (req == null || req.platzId() == null || req.werte() == null || req.werte().isEmpty()) {
+            return ResponseEntity.badRequest().build();
         }
 
         Messwert messwert = new Messwert();
-        messwert.setPlatzId(data.platzId());
+        messwert.setPlatzId(req.platzId());
         messwert.setGemessenAm(LocalDateTime.now().withNano(0));
 
-        for (SensorWertDto w : data.werte()) {
+        for (SensorWertItem w : req.werte()) {
             if (w.typId() == null) continue;
 
             switch (w.typId()) {
@@ -82,45 +91,18 @@ public class ArduinoController {
             }
         }
 
+        // Hier deinen bisherigen Repository-/Service-Aufruf zum Speichern beibehalten, z. B.:
         messwertRepository.save(messwert);
 
-        // Live-Status im Platz aktualisieren, damit Dashboard & Camunda die echten ESP32-Werte sehen
-        platzRepository.findById(data.platzId()).ifPresent(platz -> {
-            if (messwert.getFeuchte10cm() != null) {
-                platz.setFeuchte10Cm(messwert.getFeuchte10cm());
-            }
-            if (messwert.getFeuchte35cm() != null) {
-                platz.setFeuchte35Cm(messwert.getFeuchte35cm());
-            }
-            platzRepository.save(platz);
-        });
+        double sollLpm = platzRepository.findById(req.platzId())
+                .map(Platz::getSollDurchfluss)
+                .orElse(Platz.SOLL_DURCHFLUSS_MAX);
 
-        System.out.printf("Messwert gespeichert fuer Platz %d (Simulation=%s) | 10cm=%.1f%% (%.1f°C), 35cm=%.1f%% (%.1f°C), Luft=%.1f°C, Flow=%.2f l/min%n",
-                data.platzId(), data.simulation(),
-                messwert.getFeuchte10cm(), messwert.getTemp10cm(),
-                messwert.getFeuchte35cm(), messwert.getTemp35cm(),
-                messwert.getLuftTemperatur(), messwert.getDurchfluss());
-
-        return ResponseEntity.ok("Messwert gespeichert");
+        return ResponseEntity.ok(new ArduinoDataResponse("OK", req.platzId(), sollLpm));
     }
 
-    @PostMapping("/reboot")
-    public ResponseEntity<String> handleReboot(@RequestBody RebootRequest request) {
-        System.out.println("Arduino Neustart gemeldet! Status: " + request.status() + ", Grund: " + request.grund());
-        logEvent("INFO", "ESP32 Neustart gemeldet. Grund: " + request.grund());
-        return ResponseEntity.ok("{\"status\":\"ok\"}");
-    }
-
-    @PostMapping("/configure/ack")
-    public ResponseEntity<String> handleConfigAck(@RequestBody String payload) {
-        System.out.println("Config-ACK empfangen: " + payload);
-        return ResponseEntity.ok("ACK erhalten");
-    }
-
-    private void logEvent(String typ, String nachricht) {
-        SystemEventLog event = new SystemEventLog(typ, "SENSORIK", null, nachricht);
-        eventLogRepository.save(event);
+    @PostMapping("/event")
+    public ResponseEntity receiveEvent(@RequestBody Map<String, Object> payload) {
+        return ResponseEntity.ok(Map.of("status", "OK"));
     }
 }
-
-record RebootRequest(String status, String grund) {}
