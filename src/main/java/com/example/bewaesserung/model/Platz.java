@@ -69,6 +69,28 @@ public class Platz {
     @Column(name = "FEUCHTE_35CM")
     private Double feuchte35Cm;
 
+    @Column(name = "LATITUDE")
+    private Double latitude;
+
+    @Column(name = "LONGITUDE")
+    private Double longitude;
+
+    public Double getLatitude() {
+        return latitude;
+    }
+
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
+    }
+
     public static final double SOLL_DURCHFLUSS_MAX = 24.0;
 
     // Eingemessener Soll-Durchfluss in l/min (Startwert MAX = 24.0, wird vor Ort per Handy eingemessen)
