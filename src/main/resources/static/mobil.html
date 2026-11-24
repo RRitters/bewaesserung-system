@@ -114,6 +114,22 @@
             color: #ffffff;
             border-color: #1d2939;
         }
+        .btn-scope[data-scope="ALLE"].active {
+            background: #991b1b;
+            border-color: #991b1b;
+        }
+        .scope-warnung {
+            display: none;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 14px;
+        }
+        .scope-warnung.sichtbar { display: block; }
         .btn-save {
             width: 100%;
             background: #12b76a;
@@ -129,6 +145,22 @@
             font-weight: 600;
             min-height: 22px;
             color: #039855;
+        }
+        .pin-leiste {
+            margin-top: 12px;
+            text-align: center;
+            font-size: 12px;
+            color: #667085;
+        }
+        .pin-link {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 12px;
+            font-weight: 600;
+            color: #026aa2;
+            text-decoration: underline;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -175,13 +207,21 @@
         <button type="button" class="btn-scope" data-scope="ALLE" onclick="setzeScope('ALLE')">Alle Plätze</button>
     </div>
 
+    <div class="scope-warnung" id="scopeWarnung"></div>
+
     <button class="btn-save" onclick="speichereSoll()">Vorgabe dauerhaft speichern</button>
 
     <div class="status" id="statusText"></div>
+
+    <div class="pin-leiste">
+        PIN-Schutz aktiv · <button type="button" class="pin-link" onclick="sperrePinSofort()">PIN jetzt sperren</button>
+    </div>
 </div>
 
 <script>
     const MAX_DISTANZ_METER = 50;
+    const EINMESS_PIN = '250889'; // Eigene PIN festlegen
+    const PIN_SESSION_KEY = 'einmess_pin_entsperrt';
 
     let platzConfigs = [];
     let aktuellerSoll = 24.0;
@@ -191,6 +231,104 @@
         if (!platzName) return '';
         const idx = platzName.indexOf(' - ');
         return (idx > 0) ? platzName.substring(0, idx).trim() : platzName.trim();
+    }
+
+    function zaehleBetroffenePlaetze(scope, aktiveId) {
+        const aktiveCfg = platzConfigs.find(p => p.platzId === aktiveId);
+        const aktiveReihe = aktiveCfg ? extrahiereReihe(aktiveCfg.platzName) : '';
+
+        if (scope === 'ALLE') {
+            return { anzahl: platzConfigs.length, reihe: '' };
+        }
+        if (scope === 'REIHE') {
+            const count = platzConfigs.filter(
+                p => extrahiereReihe(p.platzName).toLowerCase() === aktiveReihe.toLowerCase()
+            ).length;
+            return { anzahl: count, reihe: aktiveReihe };
+        }
+        return { anzahl: 1, reihe: aktiveReihe };
+    }
+
+    function aktualisiereScopeWarnung() {
+        const warnEl = document.getElementById('scopeWarnung');
+        const id = Number(document.getElementById('platzSelect').value);
+        const { anzahl, reihe } = zaehleBetroffenePlaetze(ausgewaehlterScope, id);
+
+        warnEl.classList.remove('sichtbar');
+        warnEl.textContent = '';
+
+        if (ausgewaehlterScope === 'REIHE') {
+            warnEl.textContent = `Hinweis: Ändert ${anzahl || 'alle'} Plätze in "${reihe || 'dieser Reihe'}".`;
+            warnEl.classList.add('sichtbar');
+        } else if (ausgewaehlterScope === 'ALLE') {
+            warnEl.textContent = `Achtung: Überschreibt ${anzahl || 'ALLE'} Plätze auf der gesamten Anlage!`;
+            warnEl.classList.add('sichtbar');
+        }
+    }
+
+    function setzeScope(scope) {
+        ausgewaehlterScope = scope;
+        document.querySelectorAll('.btn-scope').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.scope === scope);
+        });
+        aktualisiereScopeWarnung();
+    }
+
+    function sperrePinSofort() {
+        sessionStorage.removeItem(PIN_SESSION_KEY);
+        const statusEl = document.getElementById('statusText');
+        statusEl.style.color = '#026aa2';
+        statusEl.textContent = 'PIN-Sperre für diese Sitzung aktiviert.';
+    }
+
+    function pruefePin() {
+        if (sessionStorage.getItem(PIN_SESSION_KEY) === '1') {
+            return true;
+        }
+        const eingabe = prompt('Bitte Einmess-PIN eingeben, um Werte zu speichern:');
+        if (eingabe === null) {
+            return false;
+        }
+        if (eingabe.trim() === EINMESS_PIN) {
+            sessionStorage.setItem(PIN_SESSION_KEY, '1');
+            return true;
+        }
+        alert('Falsche PIN. Es wurde nichts gespeichert.');
+        return false;
+    }
+
+    function bestaetigeScope(scope, id) {
+        const { anzahl, reihe } = zaehleBetroffenePlaetze(scope, id);
+        const sollText = aktuellerSoll.toFixed(1);
+
+        if (scope === 'PLATZ') {
+            return true;
+        }
+
+        if (scope === 'REIHE') {
+            return confirm(
+                `Sollwert ${sollText} l/min wirklich auf die GANZE REIHE "${reihe}" (${anzahl} Plätze) anwenden?`
+            );
+        }
+
+        if (scope === 'ALLE') {
+            const ersterSchritt = confirm(
+                `WARNUNG: Sollwert ${sollText} l/min auf ALLE ${anzahl} PLÄTZE anwenden?`
+            );
+            if (!ersterSchritt) return false;
+
+            const bestaetigung = prompt(
+                `Zur Sicherheit bitte exakt ALLE eingeben, um ${sollText} l/min für alle Plätze zu speichern:`
+            );
+            if (bestaetigung === null) return false;
+            if (bestaetigung.trim().toUpperCase() !== 'ALLE') {
+                alert('Abgebrochen: Es wurde nicht "ALLE" eingegeben.');
+                return false;
+            }
+            return true;
+        }
+
+        return false;
     }
 
     function parseKoordinate(wert) {
@@ -322,13 +460,6 @@
         );
     }
 
-    function setzeScope(scope) {
-        ausgewaehlterScope = scope;
-        document.querySelectorAll('.btn-scope').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.scope === scope);
-        });
-    }
-
     async function ladePlaetze() {
         const res = await fetch('/api/arduino/configure');
         platzConfigs = await res.json();
@@ -352,6 +483,7 @@
             document.getElementById('sollAnzeige').textContent = aktuellerSoll.toFixed(1);
         }
         document.getElementById('statusText').textContent = '';
+        aktualisiereScopeWarnung();
         ladeIstDurchfluss();
     }
 
@@ -370,10 +502,8 @@
         const id = Number(document.getElementById('platzSelect').value);
         const statusEl = document.getElementById('statusText');
 
-        if (ausgewaehlterScope === 'ALLE') {
-            const ok = confirm(`Wirklich ${aktuellerSoll.toFixed(1)} l/min für ALLE Plätze speichern?`);
-            if (!ok) return;
-        }
+        if (!pruefePin()) return;
+        if (!bestaetigeScope(ausgewaehlterScope, id)) return;
 
         try {
             const res = await fetch('/api/plaetze/soll-durchfluss/batch', {
