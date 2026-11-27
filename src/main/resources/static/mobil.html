@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>Bewässerung Mobil</title>
     <style>
         :root {
@@ -16,13 +18,28 @@
             --info: #38bdf8;
         }
         * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { margin: 0; padding: 10px; background: var(--bg); color: var(--text); }
+        html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); min-height: 100%; }
+        body { padding: 10px; }
+        :fullscreen, ::backdrop { background: var(--bg); }
         .container { max-width: 480px; margin: 0 auto; }
 
-        .top-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+        .top-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; }
         select, input {
             width: 100%; padding: 8px 10px; border-radius: 8px;
             border: 1px solid var(--border); background: #0f172a; color: var(--text); font-size: 0.95rem;
+        }
+
+        .btn-fs {
+            padding: 7px 10px;
+            background: #1e293b;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            line-height: 1;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .card {
@@ -39,6 +56,10 @@
         .stat-box { background: #0f172a; border-radius: 8px; padding: 8px; }
         .stat-label { font-size: 0.75rem; color: var(--muted); }
         .stat-val { font-size: 0.95rem; font-weight: 700; margin-top: 2px; }
+
+        .zyklus-giessen { color: var(--accent); font-weight: 700; }
+        .zyklus-pause { color: var(--pause); font-weight: 700; }
+        .zyklus-trenner { color: var(--muted); margin: 0 3px; font-weight: 600; }
 
         .progress-wrap { width: 100%; height: 7px; background: #0f172a; border-radius: 999px; overflow: hidden; margin: 8px 0; }
         .progress-bar { height: 100%; width: 0%; background: var(--accent); transition: width 0.3s; }
@@ -70,6 +91,7 @@
             <option value="21">Lade Plätze...</option>
         </select>
         <span id="zyklus-status" class="badge BEREIT">BEREIT</span>
+        <button type="button" id="btn-fullscreen" class="btn-fs" onclick="toggleFullscreen()" title="Vollbild umschalten">⛶</button>
     </div>
 
     <!-- Kompakte Live-Übersicht -->
@@ -88,8 +110,10 @@
                 <div class="stat-val"><span id="pause-ist">0</span> / <span id="pause-soll-view">15</span> Min</div>
             </div>
             <div class="stat-box">
-                <div class="stat-label">Zyklen (Gießen / Pause)</div>
-                <div class="stat-val"><span id="anzahl-bewaesserung">0</span> / <span id="anzahl-pause">0</span></div>
+                <div class="stat-label">Zyklen</div>
+                <div class="stat-val" id="zyklen-anzeige">
+                    <span class="zyklus-giessen">0 Gießen</span><span class="zyklus-trenner">/</span><span class="zyklus-pause">0 Pause</span>
+                </div>
             </div>
             <div class="stat-box">
                 <div class="stat-label">Soll-Durchfluss</div>
@@ -98,6 +122,7 @@
         </div>
     </div>
 
+    <!-- Sollwerte + Stepper + Batch -->
     <!-- Sollwerte + Stepper + Batch -->
     <div class="card">
         <div class="field">
@@ -122,7 +147,7 @@
                 <input type="number" id="input-soll-liter" step="1" min="0" />
             </div>
             <div class="field">
-                <label>Liter pro Puls (L)</label>
+                <label>Liter pro Gießzyklus (L)</label>
                 <input type="number" id="input-puls-liter" step="1" min="0" />
             </div>
         </div>
@@ -159,6 +184,40 @@
 <script>
     let allePlaetze = [];
     let eingabenInitialisiert = false;
+
+    async function toggleFullscreen() {
+        const el = document.documentElement;
+        const fsElement = document.fullscreenElement || document.webkitFullscreenElement;
+        try {
+            if (!fsElement) {
+                if (el.requestFullscreen) {
+                    await el.requestFullscreen();
+                } else if (el.webkitRequestFullscreen) {
+                    el.webkitRequestFullscreen();
+                } else {
+                    window.scrollTo(0, 1);
+                    document.getElementById("status-msg").textContent = "Tipp: Im Browser-Menü 'Zum Startbildschirm hinzufügen' wählen.";
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    await document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                }
+            }
+        } catch (err) {
+            document.getElementById("status-msg").textContent = "Vollbild nicht möglich: " + err.message;
+        }
+    }
+
+    function aktualisiereFullscreenIcon() {
+        const btn = document.getElementById("btn-fullscreen");
+        const aktiv = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+        btn.textContent = aktiv ? "✕" : "⛶";
+    }
+
+    document.addEventListener("fullscreenchange", aktualisiereFullscreenIcon);
+    document.addEventListener("webkitfullscreenchange", aktualisiereFullscreenIcon);
 
     function getAktuellePlatzId() {
         return document.getElementById("platz-select").value;
@@ -231,15 +290,19 @@
             const sollL = Number(d.sollLiter ?? 0);
             const stoppL = Number(d.naechsteAbschaltungLiter ?? 0);
             const rest = Math.max(0, stoppL - istL);
+            const anzahlB = d.anzahlBewaesserung ?? 0;
+            const anzahlP = d.anzahlPause ?? 0;
 
             document.getElementById("ist-liter").textContent = istL.toFixed(1);
             document.getElementById("soll-liter-view").textContent = sollL.toFixed(1);
             document.getElementById("liter-progress").style.width = `${sollL > 0 ? Math.min(100, (istL / sollL) * 100) : 0}%`;
-            document.getElementById("naechste-abschaltung").textContent = stoppL > 0 ? `${stoppL.toFixed(1)} L (Rest ${rest.toFixed(1)})` : "-";
+            document.getElementById("naechste-abschaltung").textContent = stoppL > 0 ? `${stoppL.toFixed(1)} L (Rest ${rest.toFixed(1)} L)` : "-";
             document.getElementById("pause-ist").textContent = Number(d.einsickerpauseIstMin ?? 0).toFixed(0);
             document.getElementById("pause-soll-view").textContent = Number(d.einsickerpauseSollMin ?? 0).toFixed(0);
-            document.getElementById("anzahl-bewaesserung").textContent = d.anzahlBewaesserung ?? 0;
-            document.getElementById("anzahl-pause").textContent = d.anzahlPause ?? 0;
+            document.getElementById("zyklen-anzeige").innerHTML =
+                `<span class="zyklus-giessen">${anzahlB} Gießen</span>` +
+                `<span class="zyklus-trenner">/</span>` +
+                `<span class="zyklus-pause">${anzahlP} Pause</span>`;
             document.getElementById("soll-lpm-view").textContent = Number(d.sollDurchflussLpm ?? 0).toFixed(1);
 
             if (!eingabenInitialisiert) {
@@ -338,11 +401,9 @@
         );
     }
 
-    (async () => {
-        await ladeAllePlaetze();
-        await ladePlatzStatus();
-        setInterval(ladePlatzStatus, 5000);
-    })();
+    ladePlatzStatus();
+    ladeAllePlaetze();
+    setInterval(ladePlatzStatus, 5000);
 </script>
 </body>
 </html>
