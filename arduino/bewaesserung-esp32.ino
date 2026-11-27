@@ -89,9 +89,9 @@ enum StoerungsZustand {
 
 // Task-Variablen für den Loop
 unsigned long lastVentilTime = 0;
-const unsigned long ventilIntervall = 500; // 500 ms Takt für die Ventilsteuerung (20 Stufen)
+const unsigned long ventilIntervall = 500;   // Takt für Ventil-Prüfung/Regelung
 unsigned long lastSensorTime = 0;
-const unsigned long sensorIntervall = 2000;
+const unsigned long sensorIntervall = 60000; // Vorübergehend 60s zum Schonen der DB
 unsigned long lastNetzwerkTime = 0;
 const unsigned long netzwerkIntervall = 5000;
 
@@ -157,8 +157,17 @@ private:
     float sollDurchflussLpm;
     float istDurchflussLpm;
     float minSprenklerLpm;
-    const float MAX_DURCHFLUSS = 30.0f; // Obergrenze (Leckageschutz)
-    int aktuelleStufe = 0;              // 0 (zu) bis 20 (voll offen)
+    const float MAX_DURCHFLUSS = 30.0f;             // Obergrenze (Leckageschutz)
+    const float MAX_SIM_DURCHFLUSS = 24.0f;         // Max. Durchfluss bei Stufe 20 in Simulation
+    const int MAX_STUFEN = 20;                      // 0 (zu) bis 20 (voll offen / Referenzpunkt)
+    const float SCHRITT_LPM = 24.0f / 20.0f;        // 1.2 l/min pro Stufe
+    const float TOTBAND_LPM = (1.2f * 0.5f) + 0.15f;  // 0.75 l/min (> halbe Schrittweite 0.6 l/min)
+    const unsigned long REGEL_BERUHIGUNG_MS = 3000; // Wartezeit nach Verstellung
+
+    int aktuelleStufe = 20;                          // Startet offen (20/20)
+    float letzterAngefahrenerSoll = -1.0f;
+    bool amStueckAngefahren = false;
+    unsigned long letzteVerstellungMs = 0;
 
 public:
     Durchflusssteuerung() {
@@ -166,16 +175,26 @@ public:
         sollDurchflussLpm = 0.0f;
         istDurchflussLpm = 0.0f;
         minSprenklerLpm = 6.0f;
+        aktuelleStufe = MAX_STUFEN;
     }
 
-    void initialisiere(int vId, float minLpm) {
+    void initialisiere(int vId, float minLpm, float startSollLpm = 0.0f) {
         ventilModbusId = vId;
         minSprenklerLpm = minLpm;
-        aktuelleStufe = 0;
+        sollDurchflussLpm = startSollLpm;
+        istDurchflussLpm = 0.0f;
+        aktuelleStufe = MAX_STUFEN; // Oberer Referenzpunkt: offen
+        letzterAngefahrenerSoll = -1.0f;
+        amStueckAngefahren = false;
+        letzteVerstellungMs = 0;
     }
 
     void setSollDurchfluss(float soll) {
-        sollDurchflussLpm = soll;
+        if (fabsf(soll - sollDurchflussLpm) > 0.01f) {
+            sollDurchflussLpm = soll;
+            // Bei neuem Sollwert aus mobil.html darf einmal am Stück angefahren werden
+            amStueckAngefahren = false;
+        }
     }
 
     void setIstDurchfluss(float ist) {
@@ -186,7 +205,6 @@ public:
         return aktuelleStufe;
     }
 
-    // Wird alle 500ms aufgerufen (entspricht einem von 20 Schritten für die 10s Laufzeit)
     void updateRegelung() {
         if (ventilModbusId <= 0) return;
 
@@ -197,39 +215,69 @@ public:
             return;
         }
 
-        if (sollDurchflussLpm <= 0.0f) {
-            if (aktuelleStufe > 0) {
-                aktuelleStufe--;
-                Serial.printf("Ventil %d schliesst weiter (Stufe %d/20)...\n", ventilModbusId, aktuelleStufe);
-            }
+        unsigned long jetzt = millis();
+        if (jetzt - letzteVerstellungMs < REGEL_BERUHIGUNG_MS) {
             return;
         }
 
-        // Totband +-0.3 l/min gegen ständiges Nachregeln
-        if (istDurchflussLpm < (sollDurchflussLpm - 0.3f) && aktuelleStufe < 20) {
-            aktuelleStufe++;
-            if (SIMULATION_MODUS) {
-                istDurchflussLpm = (aktuelleStufe / 20.0f) * 24.0f;
+        int alteStufe = aktuelleStufe;
+
+        if (sollDurchflussLpm <= 0.0f) {
+            // Zonenventil offen lassen/stellen (Sonne / Waermeausdehnung / Druckausgleich)
+            if (aktuelleStufe < MAX_STUFEN) {
+                aktuelleStufe = MAX_STUFEN;
             }
-            Serial.printf("Ventil %d oeffnet einen Schritt (Stufe %d/20) | Ist: %.1f / Soll: %.1f l/min\n",
-                          ventilModbusId, aktuelleStufe, istDurchflussLpm, sollDurchflussLpm);
-        } else if (istDurchflussLpm > (sollDurchflussLpm + 0.3f) && aktuelleStufe > 0) {
-            aktuelleStufe--;
-            if (SIMULATION_MODUS) {
-                istDurchflussLpm = (aktuelleStufe / 20.0f) * 24.0f;
+            amStueckAngefahren = false;
+        } else if (!amStueckAngefahren || fabsf(sollDurchflussLpm - letzterAngefahrenerSoll) > 0.01f) {
+            // Von der offenen Stellung (20) einmal am Stück auf geschätzte Stufe fahren
+            aktuelleStufe = MAX_STUFEN;
+            int zielStufe = (int)roundf(sollDurchflussLpm / SCHRITT_LPM);
+            if (zielStufe < 1) zielStufe = 1;
+            if (zielStufe > MAX_STUFEN) zielStufe = MAX_STUFEN;
+
+            aktuelleStufe = zielStufe;
+            letzterAngefahrenerSoll = sollDurchflussLpm;
+            amStueckAngefahren = true;
+        } else {
+            // Danach ruhige Feinregelung mit Totband gegen Druck-/Sensor-Schwankungen
+            if (istDurchflussLpm < (sollDurchflussLpm - TOTBAND_LPM) && aktuelleStufe < MAX_STUFEN) {
+                aktuelleStufe++;
+            } else if (istDurchflussLpm > (sollDurchflussLpm + TOTBAND_LPM) && aktuelleStufe > 0) {
+                aktuelleStufe--;
             }
-            Serial.printf("Ventil %d drosselt einen Schritt (Stufe %d/20) | Ist: %.1f / Soll: %.1f l/min\n",
-                          ventilModbusId, aktuelleStufe, istDurchflussLpm, sollDurchflussLpm);
+        }
+
+        if (aktuelleStufe != alteStufe) {
+            letzteVerstellungMs = jetzt;
+
+            if (SIMULATION_MODUS) {
+                istDurchflussLpm = (aktuelleStufe / (float)MAX_STUFEN) * MAX_SIM_DURCHFLUSS;
+            }
+
+            if (sollDurchflussLpm <= 0.0f) {
+                Serial.printf("Zonenventil %d offen/auf Referenz gestellt (Stufe %d/%d)\n",
+                              ventilModbusId, aktuelleStufe, MAX_STUFEN);
+            } else if (fabsf((float)(aktuelleStufe - alteStufe)) > 1.0f) {
+                Serial.printf("Ventil %d faehrt am Stueck von Stufe %d auf %d/%d | Ist: %.1f / Soll: %.1f l/min\n",
+                              ventilModbusId, alteStufe, aktuelleStufe, MAX_STUFEN, istDurchflussLpm, sollDurchflussLpm);
+            } else if (aktuelleStufe > alteStufe) {
+                Serial.printf("Ventil %d oeffnet einen Schritt (Stufe %d/%d) | Ist: %.1f / Soll: %.1f l/min\n",
+                              ventilModbusId, aktuelleStufe, MAX_STUFEN, istDurchflussLpm, sollDurchflussLpm);
+            } else {
+                Serial.printf("Ventil %d drosselt einen Schritt (Stufe %d/%d) | Ist: %.1f / Soll: %.1f l/min\n",
+                              ventilModbusId, aktuelleStufe, MAX_STUFEN, istDurchflussLpm, sollDurchflussLpm);
+            }
         }
     }
 
 private:
     void schliesseNotfall() {
         aktuelleStufe = 0;
-        Serial.printf("[NOTFALL] Ventil Modbus %d sofort geschlossen (Stufe 0/20).\n", ventilModbusId);
+        letzteVerstellungMs = millis();
+        Serial.printf("[NOTFALL] Ventil Modbus %d sofort geschlossen (Stufe 0/%d).\n",
+                      ventilModbusId, MAX_STUFEN);
     }
 };
-
 // --- PLATZ KLASSE ---
 class Platz {
 public:
@@ -365,7 +413,7 @@ public:
         }
     }
 
-void sendeSensorenDaten() {
+    void sendeSensorenDaten() {
         if (aktuelleMesswerte.empty() || WiFi.status() != WL_CONNECTED) return;
 
         float letzterDurchflussLpm = 0.0f;
@@ -417,15 +465,12 @@ void sendeSensorenDaten() {
 
                     if (!err && !respDoc["sollDurchflussLpm"].isNull()) {
                         float neuerSollLpm = respDoc["sollDurchflussLpm"].as<float>();
-
-                        // Falls die Platz-Klasse ein Feld sollDurchflussLpm hat, hier übernehmen:
                         sollDurchflussLpm = neuerSollLpm;
 
                         if (hatDurchflussWert) {
                             durchflussRegler.setIstDurchfluss(letzterDurchflussLpm);
                         }
 
-                        // Hier deine echte Sollwert-/Regler-Methode von durchflussRegler eintragen, z. B.:
                         durchflussRegler.setSollDurchfluss(neuerSollLpm);
 
                         Serial.printf("[LIVE-SOLL] Platz %d -> empfangener Soll-Durchfluss: %.1f l/min (Stufe %d)\n",
@@ -442,6 +487,7 @@ void sendeSensorenDaten() {
 };
 
 std::vector<Platz> gartenPlaetze;
+
 // --- NETZWERK FUNKTIONEN ---
 bool meldeNeustart() {
     Serial.println("Versuche Wiederanlauf an Backend zu melden...");
@@ -569,7 +615,7 @@ void loop() {
         lastVentilTime = currentMillis;
     }
 
-    // Task 2: Sensoren (im 2-Sekunden Takt)
+    // Task 2: Sensoren (im 60-Sekunden Takt)
     if (currentMillis - lastSensorTime >= sensorIntervall) {
         gartenPlaetze[platzIndex].leseSensoren();
         gartenPlaetze[platzIndex].sendeSensorenDaten();

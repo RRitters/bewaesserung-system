@@ -461,8 +461,30 @@
     }
 
     async function ladePlaetze() {
-        const res = await fetch('/api/arduino/configure');
-        platzConfigs = await res.json();
+        const [resPlaetze, resCfg] = await Promise.all([
+            fetch('/api/plaetze'),
+            fetch('/api/arduino/configure')
+        ]);
+
+        const plaetzeListe = await resPlaetze.json();
+        const cfgListe = resCfg.ok ? await resCfg.json() : [];
+        const cfgMap = new Map(cfgListe.map(c => [Number(c.platzId), c]));
+
+        platzConfigs = plaetzeListe.map(p => {
+            const cfg = cfgMap.get(Number(p.id)) || {};
+            return {
+                ...cfg,
+                platzId: p.id,
+                platzName: p.name,
+                latitude: p.latitude,
+                longitude: p.longitude,
+                ventil: cfg.ventil || {
+                    sollDurchflussLpm: p.sollDurchfluss ?? 0,
+                    minDurchflussLpm: 0,
+                    laufzeitMs: 0
+                }
+            };
+        });
 
         const select = document.getElementById('platzSelect');
         select.innerHTML = platzConfigs.map(p =>
