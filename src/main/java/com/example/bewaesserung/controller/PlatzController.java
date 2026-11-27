@@ -2,10 +2,12 @@ package com.example.bewaesserung.controller;
 
 import com.example.bewaesserung.model.Platz;
 import com.example.bewaesserung.repository.PlatzRepository;
+import com.example.bewaesserung.service.PlatzSteuerungService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -14,6 +16,9 @@ public class PlatzController {
 
     @Autowired
     private PlatzRepository platzRepository;
+
+    @Autowired
+    private PlatzSteuerungService platzSteuerungService;
 
     public record SollDurchflussBatchRequest(
             Long platzId,
@@ -28,6 +33,11 @@ public class PlatzController {
             double sollDurchflussLpm
     ) {}
 
+    public record GeoUpdateRequest(
+            Double latitude,
+            Double longitude
+    ) {}
+
     // Alle Plätze abrufen (für die Übersicht auf dem Handy oder den Arduino-Start)
     @GetMapping
     public List<Platz> getAllPlaetze() {
@@ -39,6 +49,22 @@ public class PlatzController {
     public ResponseEntity<Platz> savePlatz(@RequestBody Platz platz) {
         Platz savedPlatz = platzRepository.save(platz);
         return ResponseEntity.ok(savedPlatz);
+    }
+
+    // Geo-Position eines Platzes speichern
+    @PutMapping("/{platzId}/geo")
+    public ResponseEntity<Platz> updateGeo(@PathVariable Long platzId,
+                                           @RequestBody GeoUpdateRequest req) {
+        if (req == null || req.latitude() == null || req.longitude() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return platzRepository.findById(platzId)
+                .map(p -> {
+                    p.setLatitude(req.latitude());
+                    p.setLongitude(req.longitude());
+                    return ResponseEntity.ok(platzRepository.save(p));
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     // Soll-Durchfluss auf einen Platz, eine ganze Reihe oder alle Plätze anwenden
@@ -79,6 +105,13 @@ public class PlatzController {
 
         for (Platz p : zielPlaetze) {
             p.setSollDurchfluss(clamped);
+            try {
+                platzSteuerungService.aktualisiereSollwerte(
+                        p.getId(), null, null, null, BigDecimal.valueOf(clamped), false
+                );
+            } catch (IllegalArgumentException ignored) {
+                // Platz ohne PLATZ_STEUERUNG-Zeile
+            }
         }
         platzRepository.saveAll(zielPlaetze);
 

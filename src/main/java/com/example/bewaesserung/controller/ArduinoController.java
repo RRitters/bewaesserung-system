@@ -1,9 +1,11 @@
 package com.example.bewaesserung.controller;
 
+import com.example.bewaesserung.entity.PlatzSteuerung;
 import com.example.bewaesserung.model.Messwert;
 import com.example.bewaesserung.model.Platz;
 import com.example.bewaesserung.repository.MesswertRepository;
 import com.example.bewaesserung.repository.PlatzRepository;
+import com.example.bewaesserung.service.PlatzSteuerungService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,9 +21,11 @@ public class ArduinoController {
     @Autowired
     private PlatzRepository platzRepository;
 
-    // TODO: Dein bestehendes Repository/Service zum Speichern in MESSWERTE einfügen, z. B.:
     @Autowired
     private MesswertRepository messwertRepository;
+
+    @Autowired
+    private PlatzSteuerungService platzSteuerungService;
 
     public record SensorWertItem(
             Integer typId,
@@ -50,7 +54,7 @@ public class ArduinoController {
     ) {}
 
     @PostMapping("/reboot")
-    public ResponseEntity receiveReboot(@RequestBody(required = false) Map<String, Object> payload) {
+    public ResponseEntity<?> receiveReboot(@RequestBody(required = false) Map<String, Object> payload) {
         return ResponseEntity.ok(Map.of("status", "OK"));
     }
 
@@ -86,23 +90,35 @@ public class ArduinoController {
                     if (w.feuchte() != null) messwert.setLuftFeuchte(w.feuchte());
                 }
                 case 4 -> { // Durchfluss
-                    if (w.durchflussLpm() != null) messwert.setDurchfluss(w.durchflussLpm());
+                    if (w.durchflussLpm() != null) {
+                        messwert.setDurchfluss(w.durchflussLpm());
+                        try {
+                            platzSteuerungService.verarbeiteDurchflussMessung(req.platzId(), w.durchflussLpm());
+                        } catch (IllegalArgumentException ignored) {
+                            // Platz hat noch keinen Eintrag in PLATZ_STEUERUNG
+                        }
+                    }
                 }
             }
         }
 
-        // Hier deinen bisherigen Repository-/Service-Aufruf zum Speichern beibehalten, z. B.:
         messwertRepository.save(messwert);
 
-        double sollLpm = platzRepository.findById(req.platzId())
-                .map(Platz::getSollDurchfluss)
-                .orElse(Platz.SOLL_DURCHFLUSS_MAX);
+        double sollLpm;
+        try {
+            PlatzSteuerung st = platzSteuerungService.holeSteuerung(req.platzId());
+            sollLpm = st.getSollDurchflussLpm().doubleValue();
+        } catch (IllegalArgumentException e) {
+            sollLpm = platzRepository.findById(req.platzId())
+                    .map(Platz::getSollDurchfluss)
+                    .orElse(Platz.SOLL_DURCHFLUSS_MAX);
+        }
 
         return ResponseEntity.ok(new ArduinoDataResponse("OK", req.platzId(), sollLpm));
     }
 
     @PostMapping("/event")
-    public ResponseEntity receiveEvent(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<?> receiveEvent(@RequestBody Map<String, Object> payload) {
         return ResponseEntity.ok(Map.of("status", "OK"));
     }
 }
