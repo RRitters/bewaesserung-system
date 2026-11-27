@@ -1,588 +1,251 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Platz-Einmessung (Mobil)</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bewässerung Mobil</title>
     <style>
-        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-        body { margin: 0; padding: 16px; background: #f2f4f7; color: #1d2939; }
-        h1 { font-size: 20px; margin: 0 0 12px 0; text-align: center; }
-        .card {
-            background: #ffffff;
-            border-radius: 14px;
-            padding: 18px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --border: #334155;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --accent: #22c55e;
+            --accent-dark: #16a34a;
+            --pause: #f59e0b;
+            --info: #38bdf8;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 16px;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .container {
             max-width: 480px;
             margin: 0 auto;
         }
-        .gps-box {
-            background: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            border-radius: 12px;
-            padding: 12px;
-            margin-bottom: 16px;
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
         }
-        .btn-gps {
+
+        h1 {
+            font-size: 1.25rem;
+            margin: 0;
+        }
+
+        select, input {
             width: 100%;
-            background: #166534;
-            color: #ffffff;
-            font-size: 15px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: #0f172a;
+            color: var(--text);
+            font-size: 1rem;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px;
+            margin-bottom: 14px;
+        }
+
+        .card h2 {
+            font-size: 1rem;
+            margin: 0 0 12px 0;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .badge {
+            padding: 5px 12px;
+            border-radius: 999px;
             font-weight: 700;
-            padding: 12px;
-            border-radius: 10px;
+            font-size: 0.85rem;
+            background: #334155;
         }
-        .btn-gps:active { background: #14532d; }
-        .btn-gps:disabled { opacity: 0.65; cursor: wait; }
-        .gps-info {
-            margin-top: 8px;
-            font-size: 13px;
-            line-height: 1.4;
-            color: #166534;
-            font-weight: 500;
-            min-height: 18px;
+
+        .badge.GIESSEN { background: rgba(34, 197, 94, 0.2); color: var(--accent); border: 1px solid var(--accent); }
+        .badge.EINSICKERN { background: rgba(245, 158, 11, 0.2); color: var(--pause); border: 1px solid var(--pause); }
+        .badge.FERTIG { background: rgba(56, 189, 248, 0.2); color: var(--info); border: 1px solid var(--info); }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.12);
         }
-        label { font-size: 13px; color: #667085; font-weight: 600; display: block; margin-bottom: 6px; }
-        select {
+
+        .row:last-child {
+            border-bottom: none;
+        }
+
+        .label {
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .value {
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .progress-wrap {
             width: 100%;
-            padding: 14px;
-            font-size: 17px;
-            font-weight: 600;
-            border-radius: 10px;
-            border: 1px solid #d0d5dd;
-            background: #fff;
-            margin-bottom: 18px;
+            height: 10px;
+            background: #0f172a;
+            border-radius: 999px;
+            overflow: hidden;
+            margin: 10px 0 4px 0;
         }
-        .werte-row {
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: var(--accent);
+            transition: width 0.4s ease;
+        }
+
+        .field {
+            margin-bottom: 12px;
+        }
+
+        .field label {
+            display: block;
+            font-size: 0.88rem;
+            color: var(--muted);
+            margin-bottom: 5px;
+        }
+
+        /* Stepper-Buttons (-2 / -0.5 / +0.5 / +2) */
+        .stepper-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1.4fr 1fr 1fr;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .stepper-row input {
+            text-align: center;
+            font-weight: 700;
+            padding: 10px 4px;
+        }
+
+        .btn-step {
+            padding: 10px 4px;
+            background: #0f172a;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .btn-step:active {
+            background: #334155;
+        }
+
+        .btn-group {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 18px;
-        }
-        .wert-box {
-            background: #f8fafc;
-            border: 1px solid #e4e7ec;
-            border-radius: 10px;
-            padding: 12px;
-            text-align: center;
-        }
-        .wert-box .titel { font-size: 12px; color: #667085; }
-        .wert-box .zahl { font-size: 26px; font-weight: 700; margin-top: 4px; }
-        .soll-farbe { color: #026aa2; }
-        .ist-farbe { color: #039855; }
-        .btn-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
             gap: 10px;
-            margin-bottom: 14px;
+            margin-top: 14px;
         }
+
         button {
+            padding: 12px;
             border: none;
             border-radius: 10px;
-            padding: 16px 8px;
-            font-size: 18px;
+            font-size: 0.98rem;
             font-weight: 700;
             cursor: pointer;
-            touch-action: manipulation;
         }
-        .btn-step { background: #e0f2fe; color: #026aa2; }
-        .btn-step:active { background: #bae6fd; }
-        .btn-preset {
-            width: 100%;
-            background: #f2f4f7;
-            color: #344054;
-            font-size: 15px;
-            padding: 12px;
-            margin-bottom: 14px;
-        }
-        .scope-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            margin-bottom: 14px;
-        }
-        .btn-scope {
-            background: #f8fafc;
-            color: #344054;
-            border: 1.5px solid #d0d5dd;
-            font-size: 14px;
-            font-weight: 600;
-            padding: 12px 6px;
-        }
-        .btn-scope.active {
-            background: #1d2939;
-            color: #ffffff;
-            border-color: #1d2939;
-        }
-        .btn-scope[data-scope="ALLE"].active {
-            background: #991b1b;
-            border-color: #991b1b;
-        }
-        .scope-warnung {
-            display: none;
-            background: #fef2f2;
-            border: 1px solid #fecaca;
-            color: #991b1b;
-            border-radius: 10px;
-            padding: 10px 12px;
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 14px;
-        }
-        .scope-warnung.sichtbar { display: block; }
+
         .btn-save {
+            background: #334155;
+            color: var(--text);
+        }
+
+        .btn-start {
+            background: var(--accent);
+            color: #052e16;
+        }
+
+        .btn-start:active {
+            background: var(--accent-dark);
+        }
+
+        .btn-geo {
             width: 100%;
-            background: #12b76a;
-            color: #ffffff;
-            font-size: 18px;
-            padding: 18px;
+            background: #0284c7;
+            color: #f8fafc;
+            margin-top: 8px;
         }
-        .btn-save:active { background: #039855; }
-        .status {
-            margin-top: 14px;
-            text-align: center;
-            font-size: 14px;
-            font-weight: 600;
-            min-height: 22px;
-            color: #039855;
-        }
-        .pin-leiste {
-            margin-top: 12px;
-            text-align: center;
-            font-size: 12px;
-            color: #667085;
-        }
-        .pin-link {
-            background: none;
-            border: none;
-            padding: 0;
-            font-size: 12px;
-            font-weight: 600;
-            color: #026aa2;
-            text-decoration: underline;
-            cursor: pointer;
+
+        .msg {
+            margin-top: 10px;
+            font-size: 0.88rem;
+            color: var(--info);
+            min-height: 1.2em;
         }
     </style>
 </head>
 <body>
+<div class="container">
+    <header>
+        <h1>Bewässerung Steuerung</h1>
+        <span id="live-indicator" style="font-size:0.8rem; color:#94a3b8;">Auto-Refresh 5s</span>
+    </header>
 
-<div class="card">
-    <h1>Ventil-Einmessung vor Ort</h1>
-
-    <div class="gps-box">
-        <button type="button" class="btn-gps" id="btnGps" onclick="waehleNaechstenPlatzPerGps()">
-            📍 Nächsten Platz per GPS wählen
-        </button>
-        <div class="gps-info" id="gpsStatus">Standort noch nicht abgefragt</div>
-    </div>
-
-    <label for="platzSelect">Aktiver Platz</label>
-    <select id="platzSelect"></select>
-
-    <div class="werte-row">
-        <div class="wert-box">
-            <div class="titel">SOLL-Vorgabe</div>
-            <div class="zahl soll-farbe"><span id="sollAnzeige">24.0</span> <small style="font-size:14px;">l/m</small></div>
-        </div>
-        <div class="wert-box">
-            <div class="titel">IST-Durchfluss (ESP32)</div>
-            <div class="zahl ist-farbe"><span id="istAnzeige">0.0</span> <small style="font-size:14px;">l/m</small></div>
+    <!-- Platzauswahl -->
+    <div class="card">
+        <div class="field" style="margin-bottom:0;">
+            <label for="platz-select">Platz auswählen</label>
+            <select id="platz-select" onchange="onPlatzWechsel()">
+                <option value="21">Reihe 1 - Platz 1 (ID: 21)</option>
+                <option value="22">Reihe 1 - Platz 2 (ID: 22)</option>
+            </select>
         </div>
     </div>
 
-    <label>Durchfluss abregeln / anpassen</label>
-    <div class="btn-grid">
-        <button class="btn-step" onclick="aendereSoll(-2.0)">-2.0</button>
-        <button class="btn-step" onclick="aendereSoll(-0.5)">-0.5</button>
-        <button class="btn-step" onclick="aendereSoll(+0.5)">+0.5</button>
-        <button class="btn-step" onclick="aendereSoll(+2.0)">+2.0</button>
-    </div>
+    <!-- Live-Status -->
+    <div class="card">
+        <div class="status-bar">
+            <h2 style="margin:0;">Aktueller Status</h2>
+            <span id="zyklus-status" class="badge BEREIT">BEREIT</span>
+        </div>
 
-    <button class="btn-preset" onclick="setzeSoll(24.0)">Auf MAX zurücksetzen (24.0 l/min)</button>
+        <div class="row">
+            <span class="label">Wassermenge (Ist / Soll)</span>
+            <span class="value"><span id="ist-liter">0.0</span> / <span id="soll-liter-view">0.0</span> L</span>
+        </div>
+        <div class="progress-wrap">
+            <div id="liter-progress" class="progress-bar"></div>
+        </div>
 
-    <label>Vorgabe anwenden auf</label>
-    <div class="scope-grid">
-        <button type="button" class="btn-scope active" data-scope="PLATZ" onclick="setzeScope('PLATZ')">Dieser Platz</button>
-        <button type="button" class="btn-scope" data-scope="REIHE" onclick="setzeScope('REIHE')">Ganze Reihe</button>
-        <button type="button" class="btn-scope" data-scope="ALLE" onclick="setzeScope('ALLE')">Alle Plätze</button>
-    </div>
-
-    <div class="scope-warnung" id="scopeWarnung"></div>
-
-    <button class="btn-save" onclick="speichereSoll()">Vorgabe dauerhaft speichern</button>
-
-    <div class="status" id="statusText"></div>
-
-    <div class="pin-leiste">
-        PIN-Schutz aktiv · <button type="button" class="pin-link" onclick="sperrePinSofort()">PIN jetzt sperren</button>
-    </div>
-</div>
-
-<script>
-    const MAX_DISTANZ_METER = 50;
-    const EINMESS_PIN = '250889'; // Eigene PIN festlegen
-    const PIN_SESSION_KEY = 'einmess_pin_entsperrt';
-
-    let platzConfigs = [];
-    let aktuellerSoll = 24.0;
-    let ausgewaehlterScope = 'PLATZ';
-
-    function extrahiereReihe(platzName) {
-        if (!platzName) return '';
-        const idx = platzName.indexOf(' - ');
-        return (idx > 0) ? platzName.substring(0, idx).trim() : platzName.trim();
-    }
-
-    function zaehleBetroffenePlaetze(scope, aktiveId) {
-        const aktiveCfg = platzConfigs.find(p => p.platzId === aktiveId);
-        const aktiveReihe = aktiveCfg ? extrahiereReihe(aktiveCfg.platzName) : '';
-
-        if (scope === 'ALLE') {
-            return { anzahl: platzConfigs.length, reihe: '' };
-        }
-        if (scope === 'REIHE') {
-            const count = platzConfigs.filter(
-                p => extrahiereReihe(p.platzName).toLowerCase() === aktiveReihe.toLowerCase()
-            ).length;
-            return { anzahl: count, reihe: aktiveReihe };
-        }
-        return { anzahl: 1, reihe: aktiveReihe };
-    }
-
-    function aktualisiereScopeWarnung() {
-        const warnEl = document.getElementById('scopeWarnung');
-        const id = Number(document.getElementById('platzSelect').value);
-        const { anzahl, reihe } = zaehleBetroffenePlaetze(ausgewaehlterScope, id);
-
-        warnEl.classList.remove('sichtbar');
-        warnEl.textContent = '';
-
-        if (ausgewaehlterScope === 'REIHE') {
-            warnEl.textContent = `Hinweis: Ändert ${anzahl || 'alle'} Plätze in "${reihe || 'dieser Reihe'}".`;
-            warnEl.classList.add('sichtbar');
-        } else if (ausgewaehlterScope === 'ALLE') {
-            warnEl.textContent = `Achtung: Überschreibt ${anzahl || 'ALLE'} Plätze auf der gesamten Anlage!`;
-            warnEl.classList.add('sichtbar');
-        }
-    }
-
-    function setzeScope(scope) {
-        ausgewaehlterScope = scope;
-        document.querySelectorAll('.btn-scope').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.scope === scope);
-        });
-        aktualisiereScopeWarnung();
-    }
-
-    function sperrePinSofort() {
-        sessionStorage.removeItem(PIN_SESSION_KEY);
-        const statusEl = document.getElementById('statusText');
-        statusEl.style.color = '#026aa2';
-        statusEl.textContent = 'PIN-Sperre für diese Sitzung aktiviert.';
-    }
-
-    function pruefePin() {
-        if (sessionStorage.getItem(PIN_SESSION_KEY) === '1') {
-            return true;
-        }
-        const eingabe = prompt('Bitte Einmess-PIN eingeben, um Werte zu speichern:');
-        if (eingabe === null) {
-            return false;
-        }
-        if (eingabe.trim() === EINMESS_PIN) {
-            sessionStorage.setItem(PIN_SESSION_KEY, '1');
-            return true;
-        }
-        alert('Falsche PIN. Es wurde nichts gespeichert.');
-        return false;
-    }
-
-    function bestaetigeScope(scope, id) {
-        const { anzahl, reihe } = zaehleBetroffenePlaetze(scope, id);
-        const sollText = aktuellerSoll.toFixed(1);
-
-        if (scope === 'PLATZ') {
-            return true;
-        }
-
-        if (scope === 'REIHE') {
-            return confirm(
-                `Sollwert ${sollText} l/min wirklich auf die GANZE REIHE "${reihe}" (${anzahl} Plätze) anwenden?`
-            );
-        }
-
-        if (scope === 'ALLE') {
-            const ersterSchritt = confirm(
-                `WARNUNG: Sollwert ${sollText} l/min auf ALLE ${anzahl} PLÄTZE anwenden?`
-            );
-            if (!ersterSchritt) return false;
-
-            const bestaetigung = prompt(
-                `Zur Sicherheit bitte exakt ALLE eingeben, um ${sollText} l/min für alle Plätze zu speichern:`
-            );
-            if (bestaetigung === null) return false;
-            if (bestaetigung.trim().toUpperCase() !== 'ALLE') {
-                alert('Abgebrochen: Es wurde nicht "ALLE" eingegeben.');
-                return false;
-            }
-            return true;
-        }
-
-        return false;
-    }
-
-    function parseKoordinate(wert) {
-        if (typeof wert === 'number') return Number.isFinite(wert) ? wert : NaN;
-        if (typeof wert === 'string' && wert.trim() !== '') {
-            const parsed = Number(wert.trim().replace(',', '.'));
-            return Number.isFinite(parsed) ? parsed : NaN;
-        }
-        return NaN;
-    }
-
-    function holePlatzKoordinaten(cfg) {
-        if (!cfg) return { lat: NaN, lon: NaN };
-        const lat = parseKoordinate(
-            cfg.latitude ?? cfg.lat ?? cfg.platz?.latitude ?? cfg.platz?.lat
-        );
-        const lon = parseKoordinate(
-            cfg.longitude ?? cfg.lon ?? cfg.lng ?? cfg.platz?.longitude ?? cfg.platz?.lon
-        );
-        return { lat, lon };
-    }
-
-    function berechneDistanzMeter(lat1, lon1, lat2, lon2) {
-        const erdradius = 6371000;
-        const toRad = (deg) => (deg * Math.PI) / 180;
-
-        const dLat = toRad(lat2 - lat1);
-        const dLon = toRad(lon2 - lon1);
-
-        const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(toRad(lat1)) *
-            Math.cos(toRad(lat2)) *
-            Math.sin(dLon / 2) *
-            Math.sin(dLon / 2);
-
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return erdradius * c;
-    }
-
-    function findeNaechstenPlatz(userLat, userLon) {
-        let bester = null;
-        let kleinsteDistanz = Infinity;
-
-        for (const cfg of platzConfigs) {
-            const { lat, lon } = holePlatzKoordinaten(cfg);
-            if (Number.isNaN(lat) || Number.isNaN(lon)) continue;
-
-            const dist = berechneDistanzMeter(userLat, userLon, lat, lon);
-            if (dist < kleinsteDistanz) {
-                kleinsteDistanz = dist;
-                bester = cfg;
-            }
-        }
-
-        return { cfg: bester, distanzMeter: kleinsteDistanz };
-    }
-
-    function waehleNaechstenPlatzPerGps() {
-        const gpsStatus = document.getElementById('gpsStatus');
-        const btnGps = document.getElementById('btnGps');
-
-        if (!navigator.geolocation) {
-            gpsStatus.style.color = '#b91c1c';
-            gpsStatus.textContent = 'Browser unterstützt kein GPS (Geolocation).';
-            return;
-        }
-
-        const plaetzeMitKoords = platzConfigs.filter((cfg) => {
-            const { lat, lon } = holePlatzKoordinaten(cfg);
-            return !Number.isNaN(lat) && !Number.isNaN(lon);
-        });
-
-        if (plaetzeMitKoords.length === 0) {
-            gpsStatus.style.color = '#b91c1c';
-            gpsStatus.textContent = 'Keine GPS-Koordinaten in den Platzdaten gefunden.';
-            return;
-        }
-
-        btnGps.disabled = true;
-        gpsStatus.style.color = '#166534';
-        gpsStatus.textContent = 'Ermittle aktuelle GPS-Position...';
-
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                btnGps.disabled = false;
-                const { latitude, longitude, accuracy } = pos.coords;
-                const { cfg, distanzMeter } = findeNaechstenPlatz(latitude, longitude);
-
-                if (!cfg) {
-                    gpsStatus.style.color = '#b91c1c';
-                    gpsStatus.textContent = 'Konnte keinen passenden Platz berechnen.';
-                    return;
-                }
-
-                const distGerundet = Math.round(distanzMeter);
-                const genauigkeit = Math.round(accuracy || 0);
-
-                if (distanzMeter > MAX_DISTANZ_METER) {
-                    gpsStatus.style.color = '#b45309';
-                    gpsStatus.textContent =
-                        `Nächster Platz: ${cfg.platzName} (${distGerundet} m entfernt > ${MAX_DISTANZ_METER} m, GPS ±${genauigkeit} m). Nicht automatisch gewechselt.`;
-                    return;
-                }
-
-                const select = document.getElementById('platzSelect');
-                select.value = String(cfg.platzId);
-                waehlePlatzAus();
-
-                gpsStatus.style.color = '#166534';
-                gpsStatus.textContent =
-                    `Gewählt: Platz ${cfg.platzId} – ${cfg.platzName} (~${distGerundet} m, GPS ±${genauigkeit} m)`;
-            },
-            (err) => {
-                btnGps.disabled = false;
-                gpsStatus.style.color = '#b91c1c';
-                const meldungen = {
-                    1: 'Standortzugriff verweigert – bitte GPS im Browser/Handy erlauben.',
-                    2: 'GPS-Position aktuell nicht verfügbar.',
-                    3: 'Zeitüberschreitung bei der GPS-Suche.'
-                };
-                gpsStatus.textContent = meldungen[err.code] || ('GPS-Fehler: ' + err.message);
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 12000,
-                maximumAge: 0
-            }
-        );
-    }
-
-    async function ladePlaetze() {
-        const [resPlaetze, resCfg] = await Promise.all([
-            fetch('/api/plaetze'),
-            fetch('/api/arduino/configure')
-        ]);
-
-        const plaetzeListe = await resPlaetze.json();
-        const cfgListe = resCfg.ok ? await resCfg.json() : [];
-        const cfgMap = new Map(cfgListe.map(c => [Number(c.platzId), c]));
-
-        platzConfigs = plaetzeListe.map(p => {
-            const cfg = cfgMap.get(Number(p.id)) || {};
-            return {
-                ...cfg,
-                platzId: p.id,
-                platzName: p.name,
-                latitude: p.latitude,
-                longitude: p.longitude,
-                ventil: cfg.ventil || {
-                    sollDurchflussLpm: p.sollDurchfluss ?? 0,
-                    minDurchflussLpm: 0,
-                    laufzeitMs: 0
-                }
-            };
-        });
-
-        const select = document.getElementById('platzSelect');
-        select.innerHTML = platzConfigs.map(p =>
-            `<option value="${p.platzId}">Platz ${p.platzId} – ${p.platzName}</option>`
-        ).join('');
-
-        select.addEventListener('change', waehlePlatzAus);
-        if (platzConfigs.length > 0) {
-            waehlePlatzAus();
-        }
-    }
-
-    function waehlePlatzAus() {
-        const id = Number(document.getElementById('platzSelect').value);
-        const cfg = platzConfigs.find(p => p.platzId === id);
-        if (cfg && cfg.ventil) {
-            aktuellerSoll = cfg.ventil.sollDurchflussLpm;
-            document.getElementById('sollAnzeige').textContent = aktuellerSoll.toFixed(1);
-        }
-        document.getElementById('statusText').textContent = '';
-        aktualisiereScopeWarnung();
-        ladeIstDurchfluss();
-    }
-
-    function aendereSoll(delta) {
-        setzeSoll(aktuellerSoll + delta);
-    }
-
-    function setzeSoll(wert) {
-        aktuellerSoll = Math.max(0.0, Math.min(24.0, Math.round(wert * 10) / 10));
-        document.getElementById('sollAnzeige').textContent = aktuellerSoll.toFixed(1);
-        document.getElementById('statusText').textContent = 'Noch nicht gespeichert...';
-        document.getElementById('statusText').style.color = '#d97706';
-    }
-
-    async function speichereSoll() {
-        const id = Number(document.getElementById('platzSelect').value);
-        const statusEl = document.getElementById('statusText');
-
-        if (!pruefePin()) return;
-        if (!bestaetigeScope(ausgewaehlterScope, id)) return;
-
-        try {
-            const res = await fetch('/api/plaetze/soll-durchfluss/batch', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    platzId: id,
-                    scope: ausgewaehlterScope,
-                    sollDurchflussLpm: aktuellerSoll
-                })
-            });
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-
-            const data = await res.json();
-            const aktiveCfg = platzConfigs.find(p => p.platzId === id);
-            const aktiveReihe = aktiveCfg ? extrahiereReihe(aktiveCfg.platzName) : '';
-
-            platzConfigs.forEach(p => {
-                if (!p.ventil) return;
-                if (ausgewaehlterScope === 'ALLE' ||
-                    (ausgewaehlterScope === 'REIHE' && extrahiereReihe(p.platzName).toLowerCase() === aktiveReihe.toLowerCase()) ||
-                    (ausgewaehlterScope === 'PLATZ' && p.platzId === id)) {
-                    p.ventil.sollDurchflussLpm = aktuellerSoll;
-                }
-            });
-
-            const zielText = data.scope === 'ALLE'
-                ? `alle ${data.aktualisiertePlaetze} Plätze`
-                : data.scope === 'REIHE'
-                    ? `${aktiveReihe} (${data.aktualisiertePlaetze} Plätze)`
-                    : `Platz ${id}`;
-
-            statusEl.style.color = '#039855';
-            statusEl.textContent = `Gespeichert! Vorgabe für ${zielText}: ${aktuellerSoll.toFixed(1)} l/min`;
-        } catch (e) {
-            statusEl.style.color = '#d92d20';
-            statusEl.textContent = 'Fehler beim Speichern: ' + e.message;
-        }
-    }
-
-    async function ladeIstDurchfluss() {
-        const id = Number(document.getElementById('platzSelect').value);
-        if (!id) return;
-        try {
-            const res = await fetch(`/api/measurements/sensor/${id}`);
-            const daten = await res.json();
-            if (Array.isArray(daten) && daten.length > 0 && daten[0].durchfluss !== null) {
-                document.getElementById('istAnzeige').textContent = Number(daten[0].durchfluss).toFixed(1);
-            }
-        } catch (e) {
-            // ignoriere kurzzeitige Netzwerkfehler
-        }
-    }
-
-    ladePlaetze();
-    setInterval(ladeIstDurchfluss, 2000);
-</script>
-
-</body>
-</html>
+        <div class="row">
+            <span class="label">Nächste Einsicker-Abschaltung</span>

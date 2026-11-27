@@ -2,6 +2,7 @@ package com.example.bewaesserung.controller;
 
 import com.example.bewaesserung.model.Messwert;
 import com.example.bewaesserung.repository.MesswertRepository;
+import com.example.bewaesserung.service.PlatzSteuerungService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +15,9 @@ public class MesswertController {
 
     @Autowired
     private MesswertRepository repository;
+
+    @Autowired
+    private PlatzSteuerungService platzSteuerungService;
 
     @GetMapping
     public List<Messwert> getAllMesswerte() {
@@ -30,7 +34,17 @@ public class MesswertController {
         if (messwert.getGemessenAm() == null) {
             messwert.setGemessenAm(LocalDateTime.now().withNano(0));
         }
-        return repository.save(messwert);
+        Messwert gespeichert = repository.save(messwert);
+
+        // Durchfluss in PLATZ_STEUERUNG aufintegrieren und Einsickerpause / Stopp prüfen
+        if (gespeichert.getPlatzId() != null && gespeichert.getDurchfluss() != null) {
+            platzSteuerungService.verarbeiteDurchflussMessung(
+                    gespeichert.getPlatzId(),
+                    gespeichert.getDurchfluss()
+            );
+        }
+
+        return gespeichert;
     }
 
     // Angepasster Test-Endpunkt für das neue kompakte Modell
@@ -44,8 +58,8 @@ public class MesswertController {
         m.setTemp35cm(24.0);
         m.setLuftTemperatur(23.5);
         m.setLuftFeuchte(60.0);
-        m.setDurchfluss(0.0);
+        m.setDurchfluss(15.6);
         m.setGemessenAm(LocalDateTime.now().withNano(0));
-        return repository.save(m);
+        return createMesswert(m);
     }
 }
