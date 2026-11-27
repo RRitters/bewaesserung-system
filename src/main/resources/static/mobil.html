@@ -235,7 +235,7 @@
             document.getElementById("ist-liter").textContent = istL.toFixed(1);
             document.getElementById("soll-liter-view").textContent = sollL.toFixed(1);
             document.getElementById("liter-progress").style.width = `${sollL > 0 ? Math.min(100, (istL / sollL) * 100) : 0}%`;
-            document.getElementById("naechste-abschaltung").textContent = stoppL > 0 ? `${stoppL.toFixed(1)} L (-${rest.toFixed(1)})` : "-";
+            document.getElementById("naechste-abschaltung").textContent = stoppL > 0 ? `${stoppL.toFixed(1)} L (Rest ${rest.toFixed(1)})` : "-";
             document.getElementById("pause-ist").textContent = Number(d.einsickerpauseIstMin ?? 0).toFixed(0);
             document.getElementById("pause-soll-view").textContent = Number(d.einsickerpauseSollMin ?? 0).toFixed(0);
             document.getElementById("anzahl-bewaesserung").textContent = d.anzahlBewaesserung ?? 0;
@@ -298,14 +298,14 @@
         }
     }
 
-    function erfasseUndSpeichereGeo() {
+    function erfasseUndSpeichereGeo(highAccuracy = true) {
         const platzId = getAktuellePlatzId();
         const geoMsg = document.getElementById("geo-msg");
         if (!navigator.geolocation) {
             geoMsg.textContent = "Kein GPS verfügbar.";
             return;
         }
-        geoMsg.textContent = "Ermittle GPS...";
+        geoMsg.textContent = highAccuracy ? "Ermittle GPS (hochgenau)..." : "Ermittle Position (Netzwerk)...";
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
                 const lat = Number(pos.coords.latitude.toFixed(6));
@@ -324,11 +324,17 @@
                     if (p) { p.latitude = lat; p.longitude = lon; }
                     geoMsg.textContent = "Geo-Position in PLATZ gespeichert.";
                 } catch (err) {
-                    geoMsg.textContent = "GPS ok, Speichern fehlgeschlagen: " + err.message;
+                    geoMsg.textContent = "Position erfasst, Speichern fehlgeschlagen: " + err.message;
                 }
             },
-            (err) => { geoMsg.textContent = "GPS-Fehler: " + err.message; },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            (err) => {
+                if (highAccuracy && err.code === 3) {
+                    erfasseUndSpeichereGeo(false);
+                    return;
+                }
+                geoMsg.textContent = "GPS-Fehler: " + err.message;
+            },
+            { enableHighAccuracy: highAccuracy, timeout: 20000, maximumAge: 30000 }
         );
     }
 
